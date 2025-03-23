@@ -11,4 +11,5 @@ enum SettingType: string
     case Bool = 'bool';
     case Integer = 'int';
     case Money = 'money';
+    case DateTimeLocal = 'datetime-local';
 }

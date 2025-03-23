@@ -38,4 +38,10 @@ class NavigationNodeTeamsite extends NavigationNode
     {
         return $this->teamsite->getId();
     }
+
+
+    public function getTargetAlias(): ?string
+    {
+        return null;
+    }
 }

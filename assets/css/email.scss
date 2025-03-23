@@ -1,5 +1,19 @@
+$body-bg:#FFFFFF;
 @import 'klms';
 
+.body {
+  background-color: #EBEBEB !important;
+}
+.head-wrap {
+  padding: 10px;
+  margin-bottom: 15px;
+  height: 7rem !important;
+}
 .container {
-  max-width: map-get($container-max-widths, md) ;
+  max-width: map-get($container-max-widths, md);
+  padding-bottom: 20px;
+}
+.footer {
+    margin-top: 20px;
+    background-color: #EBEBEB;
 }

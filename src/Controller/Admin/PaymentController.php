@@ -9,6 +9,7 @@ use App\Service\TicketService;
 use App\Service\TicketState;
 use App\Service\UserService;
 use Ramsey\Uuid\UuidInterface;
+
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
@@ -29,6 +30,7 @@ class PaymentController extends AbstractController
     {
         $this->ticketService = $ticketService;
         $this->userService = $userService;
+        // $this->userRepo = $manager->getRepository(User::class);
     }
 
     private function createUserSelectForm(): FormInterface
@@ -65,12 +67,37 @@ class PaymentController extends AbstractController
     }
 
     #[Route(path: '', name: '', methods: ['GET'])]
-    public function index(): Response
+    public function index(Request $request): Response
     {
+
         $tickets = $this->ticketService->queryTickets();
         $uuids = array_map(fn (Ticket $t) => $t->getRedeemer(), $tickets);
         $uuids = array_filter($uuids, fn (?UuidInterface $uuid) => !empty($uuid));
         $users = $this->userService->getUsers($uuids, assoc: true);
+/*
+        $gamers = $this->gamerService->getGamers();
+        $printDogTags = intval($request->query->get('dogtags')) === 1;
+        if ($printDogTags) {
+
+            $dogtagGamers = array_map(fn ($g) => [
+              'id' => $g['user']->getId(),
+              'uuid' => $g['user']->getUuid()->toString(),
+              'paid' => $g['status']->hasPaid(),
+              'registered' => $g['status']->getRegistered(),
+              'nickname' => $g['user']->getNickname(),
+            ], $gamers);
+
+            usort($dogtagGamers, function ($a, $b) {
+              return $b['registered'] <=> $a['registered'];
+            });
+
+            $dogtagGamers = array_reverse($dogtagGamers);
+
+            return $this->render('admin/payment/dogtags.html.twig', [
+                'gamers' => $dogtagGamers,
+            ]);
+        }
+*/
 
         return $this->render('admin/payment/index.html.twig', [
             'tickets' => $tickets,
@@ -140,6 +167,14 @@ class PaymentController extends AbstractController
                     case self::clickedIfExists($form, 'delete'):
                         $this->ticketService->deleteTicket($ticket);
                         break;
+                        /*
+                  case self::clickedIfExists($form, 'pay_toastflat'):
+                    $this->ticketService->gamerPayToastflat($user);
+                    break;
+                  case self::clickedIfExists($form, 'unpay_toastflat'):
+                    $this->gamerService->gamerUnPayToastflat($user);
+                    break;
+                        */
                     default:
                         $this->addFlash('error', "Aktion konnte nicht durchgeführt werden");
                         return $this->redirectToRoute('admin_payment');

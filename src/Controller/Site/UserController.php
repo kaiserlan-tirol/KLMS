@@ -170,7 +170,8 @@ class UserController extends AbstractController
         ]);
     }
 
-    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    // #[IsGranted('IS_AUTHENTICATED_FULLY')] // default, logs out if a user has remembered active to avoid hijacking
+    #[IsGranted('IS_AUTHENTICATED_REMEMBERED')]
     #[Route(path: '/user/profile/edit', name: 'user_profile_edit')]
     public function userProfileEdit(Request $request): Response
     {

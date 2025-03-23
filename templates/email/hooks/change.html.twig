@@ -2,9 +2,9 @@
 
 {% block main %}
   {% set org = settings.get('site.organisation') %}
-  <h1>Benachrichtigung</h1>
+  <h2>Benachrichtigung</h2>
   <p>{{ message }}</p>
-  <p>Solltest das nicht du gewesen sein, kontaktiere uns bitte.</p>
+  <p style="font-size: 90%">Solltest das nicht du gewesen sein, kontaktiere uns bitte.</p>
   <p></p>
   {% include 'email/components/greetings.html.twig' %}
 {% endblock %}

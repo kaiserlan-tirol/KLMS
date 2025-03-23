@@ -8,6 +8,12 @@
             </div>
             <div class="col-lg-6 text-right">
                 {% if is_granted('ROLE_ADMIN') %}
+                    {# <a class="btn btn-link" href="/content/admin-vereinstools">
+                        <i class="fas fa-info"></i> Vereinstools
+                    </a> #}
+                    <a class="btn btn-link" href="{{ path('admin_payment') }}">
+                        <i class="fas fa-money-bill"></i> Zahlungen
+                    </a>
                     <a class="btn btn-link" href="{{ path('admin_dashboard') }}">
                         <i class="fas fa-cogs"></i> Admin
                     </a>

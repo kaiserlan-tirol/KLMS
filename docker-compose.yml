@@ -1,20 +1,41 @@
+
 services:
   database:
-    image: postgres:12-alpine
-    environment:
-      POSTGRES_USER: 'krru'
-      POSTGRES_PASSWORD: 'krru'
-      POSTGRES_DB: 'klms'
-    ports: [ "5432:5432" ]
+    image: mariadb:10.6.16
+    platform: linux/arm64
     volumes:
-      - database:/var/lib/postgresql/data:rw
-  
+      - ../database-mysql:/var/lib/mysql
+    ports:
+      - "3323:3306"
+    env_file:
+      - ./.env
+      - ./.env.local
+    #labels:
+    #  com.symfony.server.service-ignore: true
+
+  # webserver:
+  #   build:
+  #     context: .
+  #     dockerfile: ./.docker/Dockerfile
+  #   ports:
+  #     - "80:80"
+  #   volumes:
+  #     - ../IDM:/var/www/identity # You need to have the IDM project in the same directory as the KLMS project
+  #     - .:/var/www/klms
+  #     - ./.docker/apache2/idm.conf:/etc/apache2/sites-enabled/idm.conf
+  #     - ./.docker/apache2/klms.conf:/etc/apache2/sites-enabled/klms.conf
+  #   depends_on:
+  #     - database
+  #   links:
+  #     - database
+
   mailcatcher:
     image: schickling/mailcatcher
     ports:
       - "1025:1025"
       - "1080:1080"
     labels:
+      # com.symfony.server.service-ignore: true
       com.symfony.server.service-prefix: 'MailCatcher'
 
 volumes:

@@ -126,7 +126,7 @@ $.extend(NavigationTree.prototype, {
         switch (type) {
             case "path":
                 if (path === '/') {
-                    bgColor = "#e67925";
+                    bgColor = "#ff1e22"; // light variant of "#cc0003";
                     type = 'homepage';
                     symbole = "fas fa-home";
                 } else {

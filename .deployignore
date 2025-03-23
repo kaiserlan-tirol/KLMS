@@ -1,0 +1,54 @@
+/bin/*
+!bin/console
+!bin/symfony_requirements
+/app/cache/*
+/app/logs/*
+!app/cache/.gitkeep
+!app/logs/.gitkeep
+/app/spool/*
+/var/cache/*
+/var/logs/*
+/var/sessions/*
+!var/cache/.gitkeep
+!var/logs/.gitkeep
+!var/sessions/.gitkeep
+/var/log/*
+!var/log/.gitkeep
+/app/config/parameters.yml
+/app/config/parameters.ini
+/app/bootstrap.php.cache
+/var/bootstrap.php.cache
+/app/phpunit.xml
+/phpunit.xml
+/composer.phar
+/.web-server-pid
+.env*
+/nbproject/
+.idea
+.env
+.php_cs.cache
+/node_modules
+/node_modules/
+# /public/build/
+npm-debug.log
+yarn-error.log
+public/images
+assets/images/EMail/*
+public/cache
+public/media
+*.sh
+/.php_cs
+/.php_cs.cache
+/public/media/cache/
+/tools/
+rector.php
+*.cache
+.phpunit.result.cache
+/phpunit.xml
+/var
+/public/cache
+# /vendor/
+# /web/bundles/
+/web/uploads/
+# /build/
+/public/.well-known

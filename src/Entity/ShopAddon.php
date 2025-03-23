@@ -120,7 +120,6 @@ class ShopAddon
     public function setMaxQuantityGlobal(?int $maxQuantityGlobal): static
     {
         $this->maxQuantityGlobal = $maxQuantityGlobal;
-
         return $this;
     }
 }

@@ -89,6 +89,16 @@
                             <i class="fas fa-mobile-alt fa-fw mr-3" title="Telefonnummer"></i><a href="tel:{{ user.phone }}">{{ user.phone }}</a>
                         </li>
                     {% endif %}
+                    {% if user.discordaccount | trim %}
+                        <li class="list-group-item">
+                            <i class="fab fa-discord fa-fw mr-3" title="Discord Account"></i>{{ user.discordaccount }}
+                        </li>
+                    {% endif %}
+                    {% if user.battlenetaccount | trim %}
+                        <li class="list-group-item">
+                            <i class="fab fa-battle-net fa-fw mr-3" title="Battle.net Account"></i>{{ user.battlenetaccount }}
+                        </li>
+                    {% endif %}
                     {% if user.steamaccount | trim %}
                         <li class="list-group-item">
                             <i class="fab fa-steam fa-fw mr-3" title="Steam Account"></i>{{ user.steamaccount }}

@@ -2,9 +2,11 @@
 
 namespace App\Controller\Admin;
 
+
 use App\Form\HtmlTextareaType;
 use App\Service\SettingService;
 use App\Service\SettingType;
+use App\Service\HelperService;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\CallbackTransformer;
@@ -15,6 +17,7 @@ use Symfony\Component\Form\Extension\Core\Type\MoneyType;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\UrlType;
+use Symfony\Component\Form\Extension\Core\Type\DateTimeType;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -112,6 +115,16 @@ class SettingController extends AbstractController
                     'expanded' => true,
                     'required' => true,
                     'label' => false,
+                ]);
+                break;
+            case SettingType::DateTimeLocal:
+                $fb->add('text', DateTimeType::class, [
+                    'input' => 'string',
+                    'placeholder' => [
+                        'year' => 'Year', 'month' => 'Month', 'day' => 'Day',
+                        'hour' => 'Hour', 'minute' => 'Minute'
+                    ],
+                    'input_format' => HelperService::DATE_INPUT_FORMAT,
                 ]);
                 break;
         }

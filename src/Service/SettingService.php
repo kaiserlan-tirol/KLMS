@@ -94,6 +94,11 @@ class SettingService
         'link.twitch' => [self::TB_DESCRIPTION => 'Link zum Twitchkanal', self::TB_TYPE => SettingType::URL],
 
         // extend here
+        'home.header_content_left' => [self::TB_DESCRIPTION => 'Inhalt des linken Blocks (zb What is a LAN)', self::TB_TYPE => SettingType::HTML],
+
+        'lan.party.start' => [self::TB_DESCRIPTION => 'Beginn der Lanparty', self::TB_TYPE => SettingType::DateTimeLocal],
+        'lan.party.end' => [self::TB_DESCRIPTION => 'Ende der Lanparty', self::TB_TYPE => SettingType::DateTimeLocal],
+        'lan.checklist' => [self::TB_DESCRIPTION => 'Checklist Einträge. Zeilen Bindestrich davor werden als Überschrift ausgegeben.', self::TB_TYPE => SettingType::HTML],
     ];
 
     private readonly LoggerInterface $logger;

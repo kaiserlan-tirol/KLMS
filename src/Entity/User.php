@@ -93,6 +93,14 @@ class User
     #[Groups(['read', 'write'])]
     private ?string $steamAccount = null;
 
+    #[Assert\Length(max: 250, maxMessage: 'The battle.net account cannot be longer than {{ limit }} characters')]
+    #[Groups(['read', 'write'])]
+    private ?string $battlenetAccount = null;
+
+    #[Assert\Length(max: 250, maxMessage: 'The discord account cannot be longer than {{ limit }} characters')]
+    #[Groups(['read', 'write'])]
+    private ?string $discordAccount = null;
+
     #[Groups(['read'])]
     private ?DateTimeInterface $registeredAt = null;
 
@@ -347,6 +355,30 @@ class User
     public function setSteamAccount(?string $steamAccount): self
     {
         $this->steamAccount = $steamAccount;
+
+        return $this;
+    }
+
+    public function getBattlenetAccount(): ?string
+    {
+        return $this->battlenetAccount;
+    }
+
+    public function setBattlenetAccount(?string $battlenetAccount): self
+    {
+        $this->battlenetAccount = $battlenetAccount;
+
+        return $this;
+    }
+
+    public function getDiscordAccount(): ?string
+    {
+        return $this->discordAccount;
+    }
+
+    public function setDiscordAccount(?string $discordAccount): self
+    {
+        $this->discordAccount = $discordAccount;
 
         return $this;
     }

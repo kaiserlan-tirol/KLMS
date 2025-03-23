@@ -77,6 +77,7 @@ class ShopController extends AbstractController
 
         $addons = $this->shopService->getAddons();
         $userRegistered = $this->ticketService->isUserRegistered($user);
+
         $form = $this->createForm(CheckoutType::class, options: [
             'code' => !$userRegistered,
             'addons' => $addons,
@@ -112,7 +113,7 @@ class ShopController extends AbstractController
 
             if (!$order->isEmpty()) {
                 $this->shopService->placeOrder($order);
-                $this->addFlash('success', "Order erfolgreich angelegt.");
+                $this->addFlash('success', "Bestellung erfolgreich angelegt.");
                 return $this->redirectToRoute('shop_orders');
             } else if(!$ticketActivation) {
                 $this->addFlash('warning', "Leere Bestellung kann nicht angelegt werden.");

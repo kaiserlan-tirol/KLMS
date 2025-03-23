@@ -50,8 +50,8 @@
 
 # Embedded web-server pid file
 /.web-server-pid
-
-.env.local
+.env*
+!.env.example
 /nbproject/
 .idea
 .php_cs.cache
@@ -73,6 +73,7 @@ public/cache
 public/media
 
 *.sh
+!deploy.sh
 
 ###> friendsofphp/php-cs-fixer ###
 /.php_cs

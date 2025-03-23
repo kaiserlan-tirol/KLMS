@@ -21,3 +21,34 @@ KLMS is
 
 ## Setup
 Setup instructions and system requirements can be found in our [setup documentation](SETUP.md).
+
+### Run website
+Once all setup steps are done start the Symfony development server using
+```
+XDEBUG_MODE=debug symfony server:start --port=8002 --no-tls
+```
+Open the printed URL in your browser and log in with a superuser credential 
+
+### Debugging
+```bash
+php bin/console debug:container --env-vars
+php bin/console debug:dotenv
+
+# clear cache
+php -d memory_limit=1024M bin/console cache:clear
+
+# clear doctrine cache
+php bin/console doctrine:cache:clear-metadata 
+php bin/console doctrine:cache:clear-query  
+php bin/console doctrine:cache:clear-result
+
+# debugging if datebase connection has issues (.env not picked up)
+symfony server:stop
+symfony server:reset
+php bin/console doctrine:query:sql "SELECT 1"
+# then it suddenly worked
+```
+
+## Hidden Features
+
+seatmap print view: /seatmap?print=1  .. then zoom in, take a screenshot and it gets printed in full paper size

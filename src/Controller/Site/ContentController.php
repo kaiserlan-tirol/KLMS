@@ -33,7 +33,7 @@ class ContentController extends AbstractController
         ]);
     }
 
-    #[Route(path: '/content/{slug}', requirements: ['slug' => '[a-z]+'], name: 'content_slug')]
+    #[Route(path: '/content/{slug}', requirements: ['slug' => '[a-z\d-]+'], name: 'content_slug')]
     #[ParamConverter('content', options: ['mapping' => ['slug' => 'alias']])]
     public function bySlug(Content $content): Response
     {

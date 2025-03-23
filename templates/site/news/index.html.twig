@@ -18,7 +18,91 @@
 
 
 {% block main %}
-    {% include 'site/components/stats.html.twig' %}
+<div class="container">
+    {% set user = app.user is null ? {} : app.user.user %}
+    {% if user is not empty and (user.discordaccount is empty or user.phone is empty) %}
+    <div class="row">
+        <div class="col">
+        {% include 'site/components/front-profile-details-hint.html.twig' %}
+        </div>
+    </div>
+    {% endif %}
+    <div class="row ml-0">
+        <div class="col-12 col-sm-5 order-md-2 mb-5">
+            <div class="card sidebar-right">
+                {% include 'site/components/next-party.html.twig' %}
+
+                <button class="btn btn-secondary is-mobile" type="button" data-bs-toggle="collapse" data-bs-target="#collapseStats" aria-expanded="false" aria-controls="collapseStats">
+                    LAN-Status &amp; Kontakt 
+                </button>
+
+                <div class="collapse" id="collapseStats">
+                {% include 'site/components/stats.html.twig' %}
+                {% include 'site/components/socialLinksInHeader.html.twig' %}
+                </div>
+
+                {% if settings.get('home.header_content_left', false) %}
+                <button class="btn btn-secondary is-mobile" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNeu" aria-expanded="false" aria-controls="collapseNeu">
+                    Neu auf der LAN?
+                </button>
+                <div class="card h-100 collapse" id="collapseNeu">
+                {% include 'site/components/header-content-left.html.twig' %}
+                </div>
+                {% endif %}
+                
+                {# <a class="btn btn-secondary is-mobile" type="button" href="/login">
+                    Login
+                </a> #}
+            </div>
+        </div>
+        {% set cnt = news | length %}
+        <div class="col-12 col-md-7 order-md-1">
+            <div class="row">
+                <div id="news" class="row row-cols-1" data-offset="{{ cnt }}" data-total="{{ news_total_cnt }}">
+                    {% include 'site/news/_cards.html.twig' %}
+                </div>
+
+                <div class="text-center mb-4 mt-0">
+                    {% set noMore = cnt >= news_total_cnt %}
+                    <button id="loadMore" class="btn btn-outline-secondary" {% if noMore %} style="display: none;"{% endif %}>Mehr News</button>
+                    <span id="noMore" class="text-muted" {% if not noMore %} style="display: none;"{% endif %}>Keine weiteren News</span>
+                    <div id="spinner" class="spinner-grow" role="status" style="display: none;">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+{% endblock %}
+
+{# 
+{% block main %}
+    <div class="container">
+        {% set user = app.user is null ? {} : app.user.user %}
+        {% if user is not empty and (user.discordaccount is empty or user.phone is empty) %}
+        <div class="row row-cols-1 row-cols-md-2">
+            <div class="col">
+            {% include 'site/components/front-profile-details-hint.html.twig' %}
+            </div>
+        </div>
+        {% endif %}
+        <div class="row">
+        {% if settings.get('home.header_content_left', false) %}
+            <div class="col">
+        {% include 'site/components/header-content-left.html.twig' %}
+            </div>
+        {% endif %}
+            <div class="col">
+                <div class="card h-100">
+                    {% include 'site/components/next-party.html.twig' %}
+                    {% include 'site/components/stats.html.twig' %}
+                    {% include 'site/components/socialLinksInHeader.html.twig' %}
+                </div>
+            </div>
+        </div>
+    </div>
 
     {% set cnt = news | length %}
 
@@ -36,9 +120,32 @@
             <span class="sr-only">Loading...</span>
         </div>
     </div>
-{% endblock %}
+{% endblock %} #}
+
 
 {% block javascripts %}
     {{ parent() }}
     {{ encore_entry_script_tags('news') }}
+    
+<script>
+  // Get the button and the collapsible element by ID
+  const buttons = document.querySelectorAll('[data-bs-toggle="collapse"]');
+
+  // Loop through each button
+  buttons.forEach(button => {
+    // Add click event listener to each button
+    button.addEventListener('click', function() {
+      // Get the target element based on data-bs-target attribute
+      const targetId = button.getAttribute('data-bs-target');
+      const target = document.querySelector(targetId);
+      
+      // Toggle the 'show' class on the target element
+      target.classList.toggle('show');
+      
+      // Update aria-expanded attribute based on the presence of 'show' class
+      const expanded = target.classList.contains('show') ? 'true' : 'false';
+      button.setAttribute('aria-expanded', expanded);
+    });
+  });
+</script>
 {% endblock %}

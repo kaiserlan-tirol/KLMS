@@ -54,6 +54,7 @@ class TeamsiteController extends AbstractController
             }
 
             return $this->redirectToRoute('admin_teamsite');
+            // return $this->redirectToRoute($request->attributes->get('_route'), ['id' => $teamsite->getId()]); // if you want to stay on same page
         }
 
         return $this->render('admin/teamsite/edit.html.twig', [

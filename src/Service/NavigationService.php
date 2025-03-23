@@ -121,7 +121,7 @@ class NavigationService
     {
         switch ($type) {
             case NavigationNode::NAV_NODE_TYPE_CONTENT:
-                if (preg_match('/^\/?content\/(\d+)\/?$/', $path, $output_array)) {
+                if (preg_match('/^\/?content\/([a-z\d-]+)\/?$/', $path, $output_array)) {
                     $content = $this->em->getRepository(Content::class)->findById(intval($output_array[1]));
 
                     return new NavigationNodeContent($content);

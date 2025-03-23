@@ -11,6 +11,11 @@
 {#            <button class="btn btn-success" data-toggle="modal" data-target="#newModal" id="new">#}
 {#                <i class="fas fa-plus"></i> Ticket anlegen#}
 {#            </button>#}
+
+            <a class="btn btn-success" href="?dogtags=1&unpaid=1">
+                <i class="fas fa-table"></i> DogTags
+            </a>
+
         </div>
     </div>
     <div class="row">
@@ -27,6 +32,7 @@
                         <th class="w-25">Nickname</th>
                         <th class="w-25">Name</th>
                         <th>Status</th>
+                        <th>Registriert</th>
                         <th
                                 class="text-nowrap w-1"
                                 data-orderable="false"
@@ -76,6 +82,9 @@
                                 {% else %}
                                     <span class="badge badge-secondary">Offen</span>
                                 {% endif %}
+                            </td>
+                            <td>
+                                {{ ticket.createdAt|date('Y-m-d') }}
                             </td>
                             <td>
                                 <a class="btn btn-sm btn-outline-dark text-nowrap" data-toggle="ajaxModal" href="{{ path('admin_payment_show', {'id' : ticket.id}) }}">

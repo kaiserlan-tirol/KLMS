@@ -18,7 +18,15 @@ unter der Angabe <b>Bestellnummer {{ order.id }}</b>
 an:
 <div class="border p-2 m-1">{{ settings.get('lan.signup.payment_details') | raw }}</div>
 {% else %}
-.
+<div class="border p-2 m-1">
+    <p style="outline: 0px; user-select: none;">&nbsp;</p>
+    <p style="outline: 0px; user-select: none;"><strong>Zahlung per Paypal (an Freunde senden):</strong></p>
+    <p style="outline: 0px; user-select: none;">Jetzt bezahlen: <a href="https://paypal.me/kaiserlantirol/{{ (order.calculateTotal() / 100) }}EUR" target="_blank" rel="noopener">paypal.me/kaiserlantirol/{{ (order.calculateTotal() / 100) }}EUR</a></p>
+    <p style="outline: 0px; user-select: none;">Oder an verein@kaiserlan.at</p>
+    <p style="outline: 0px; user-select: none;"><strong>Zahlung per &Uuml;berweisung</strong></p>
+    <p style="outline: 0px; user-select: none;">Empf&auml;nger: Markus Edenhauser<br />Neues Vereinskonto bei Revolut. Litauen, LT stimmt ;-)<br />IBAN: LT86 3250 0187 3587 6769<br />BIC: REVOLT21<br />Verwendungszweck: Dein Benutzer-/Gamertag</p>
+    <p style="outline: 0px; user-select: none;">&nbsp;</p>
+</div>
 {% endif %}
 {% elseif showPaymentSuccess | default(false) %}
 {% if order.calculateTotal > 0 %}

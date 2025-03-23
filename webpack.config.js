@@ -31,6 +31,7 @@ Encore
     .addEntry('sponsor', './assets/js/admin/sponsor.js')
     .addEntry('news', './assets/js/site/news.js')
     .addEntry('seatmap', './assets/js/site/seatmap.js')
+    .addEntry('features', './assets/js/site/features.js')
     .addEntry('tourney', './assets/js/site/tourney.js')
     .addEntry('shop', './assets/js/site/shop.js')
     .addEntry('admin_seatmap', './assets/js/admin/seatmap.js')

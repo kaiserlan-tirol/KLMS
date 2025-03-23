@@ -8,6 +8,7 @@ twig:
         - 'form/select2_widget.html.twig'
         - 'form/tinymce_widget.html.twig'
     globals:
+        helpers: '@App\Service\HelperService'
         nav: '@App\Service\NavigationService'
         settings: '@App\Service\SettingService'
         sponsor: '@App\Service\SponsorService'

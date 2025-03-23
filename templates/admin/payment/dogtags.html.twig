@@ -1,0 +1,71 @@
+{% extends 'admin/adminBase.html.twig' %}
+{% block stylesheets %}
+    {{ encore_entry_link_tags('app') }}
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+
+        }
+        .dogtag-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+
+        .dogtag-container > div {
+            padding: 5px;
+        }
+
+        /* =================================
+          Media Queries
+        ==================================== */
+
+        @media (min-width: 30em) {
+            .dogtag-container {
+                grid-template-rows: 1fr 1fr 1fr;
+                grid-auto-columns: 1fr;
+                grid-auto-flow: column;
+            }
+        }
+    </style>
+{% endblock %}
+{% block title %}Einzahlungen - KLMS - Admin{% endblock %}
+{% block siteheading %}<i class="fas fa-money-bill"></i> Einzahlungen{% endblock %}
+{% block main %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <a class="btn btn-secondary" href="/admin/payment">
+                <i class="fas fa-back"></i> Einzahlungen
+            </a>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <div class="card p-3">
+                <div class="dogtag-container">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Nickname</th>
+                            <th>Registered</th>
+                            <th>Paid</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for gamer in gamers %}
+                            <tr>
+                                <td>{{ gamer.nickname }}</td>
+                                <td>{{ gamer.registered|date('d.m.Y') }}</td>
+                                <td>{{ gamer.paid ? 'X' : '' }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}

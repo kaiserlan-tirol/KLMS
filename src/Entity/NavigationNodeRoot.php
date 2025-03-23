@@ -27,4 +27,9 @@ class NavigationNodeRoot extends NavigationNode
     {
         return null;
     }
+
+    public function getTargetAlias(): ?string
+    {
+        return null;
+    }
 }

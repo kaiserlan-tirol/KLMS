@@ -54,6 +54,7 @@ class SeatmapController extends AbstractController
         $seats = $this->seatmapService->getSeatmap();
         $dim = $this->seatmapService->getDimension();
 
+        # Print view is on Site/.  https://www.kaiserlan.at/seatmap?print=1
         return $this->render('admin/seatmap/index.html.twig', [
             'seatmap' => $seats,
             'dim' => $dim,

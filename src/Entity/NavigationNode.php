@@ -59,6 +59,11 @@ abstract class NavigationNode implements Stringable
     public function getPath(): ?string
     {
         $id = $this->getTargetId();
+        $alias = $this->getTargetAlias();
+
+        if (!is_null($alias)) {
+            return "/{$this->getType()}/{$alias}";
+        }
 
         return is_null($id) ? null : "/{$this->getType()}/{$id}";
     }
@@ -75,6 +80,11 @@ abstract class NavigationNode implements Stringable
     public function getName(): ?string
     {
         return $this->name;
+    }
+
+    public function getAlias(): ?string
+    {
+        return $this->alias;
     }
 
     public function setName(string $name): self

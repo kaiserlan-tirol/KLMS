@@ -1,10 +1,16 @@
-$main-color: #e67925;
-$body-bg:#fafafa;
+$main-color: #0088ff; // blue
+// $main-color: #00b626; // green
+$body-bg:#8e8e8e; // #777777;
 $shadow-color:#000;
 
 $light-muted:rgba(#fff,.75);
+$text-muted:#676767;
 
-$header-color: #fff;
+// $link-color: lighten($main-color, 20%);
+$link-color: $main-color;
+$link-hover-color: lighten($main-color, 10%);
+
+$header-color: #626262;
 $navbar-dark-color: $light-muted;
 $navbar-dark-hover-color: #fff;
 
@@ -45,3 +51,4 @@ $box-shadow-lg: 0 6.4px 14.4px 0 rgba($shadow-color,.132),0 1.2px 3.6px 0 rgba($
 $box-shadow-xl: 0 25.6px 57.6px 0 rgba($shadow-color,.22),0 4.8px 14.4px 0 rgba($shadow-color,.18);
 
 $card-avatar-size:6rem;
+$card-bg: #d1d1d1;

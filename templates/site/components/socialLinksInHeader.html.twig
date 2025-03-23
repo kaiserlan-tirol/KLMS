@@ -1,0 +1,26 @@
+<div class="container">
+    <div class="card">
+        <div class="card-body row justify-content-center">
+            <div class="social-btn-group-x">
+            <strong>Kontaktiere uns:</strong>
+                {% set provider = [
+                    {name: 'Facebook', key: 'link.fb', icon: 'fab fa-facebook-f', title: 'für Ankündigungen und News', bg: '#4267B2' },
+                    {name: 'Instagram', key: 'link.insta', icon: 'fab fa-instagram', title: 'für Bilder und Videos', bg: 'linear-gradient(45deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d)' },
+                    {name: 'Discord', key: 'link.discord', icon: 'fab fa-discord', title: 'zum Zocken und Quatschen', bg: '#7289da' },
+                    {name: 'WhatsApp', href: 'https://chat.whatsapp.com/KXDjTBfF3x16QuoZWfoYcZ', icon: 'fab fa-whatsapp', title: 'zum flotten Verabreden', bg: '#25D366' },
+                ] %}
+
+                {% for p in provider %}
+                    {% if (p.key is defined and settings.isSet(p.key)) or (p.href is defined and p.href is not empty) %}
+                        {% set href = p.key is defined and p.key is not empty ? settings.get(p.key) : p.href %}
+                        <div>
+                        <a class="btn btn-secondary mb-2" style="background: {{ p.bg }}" title="{{ p.name }}" href="{{ href }}" target="_blank">
+                            <i class="{{ p.icon }} fa-fw"></i> {{ p.title }}
+                        </a>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,4 +1,4 @@
-<div class="head-wrap {% if startpage is defined %}startpage{% endif %}" style="background-image: url({{ settings.get('style.bg_image') }})">
+<div class="head-wrap {% if startpage is defined %}startpage{% endif %}" style="background: linear-gradient(-63deg,rgba(0,136,233,0.05), rgba(0,136,233,0.3)), linear-gradient( rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.8) ), url({{ settings.get('style.bg_image') }})">
     <div class="head-content container">
         {% set logo = settings.get('style.logo') %}
         {% if startpage is not defined %}<a href="/">{% endif %}

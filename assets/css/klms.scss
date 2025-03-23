@@ -67,3 +67,34 @@ input.datepicker[readonly]:not([disabled]) {
         margin-bottom: 0.7rem;
     }
 }
+
+.is-not-mobile {
+    @media (max-width: map-get($grid-breakpoints, md)) {
+        display: none;
+    }
+}
+.is-mobile {
+    display: none;
+    @media (max-width: map-get($grid-breakpoints, md)) {
+        display: block;
+    }
+}
+
+/** home **/
+.sidebar-right {
+    .collapse {
+      display: none;
+    }
+    // always not-collapsed on desktop
+    @media (min-width: map-get($grid-breakpoints, sm)) {
+      .stats-kontakt-btn {
+        display: none;
+      }
+      .collapse {
+        display: block;
+      }
+    }
+    .collapse.show {
+      display: block;
+    }
+}

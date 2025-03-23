@@ -304,7 +304,6 @@ class ShopService
         }
         return $result;
     }
-
     /**
      * @param User|UuidInterface|null $user An optimal user to count the purchases for that user.
      * @return array Array mapping AddonId to count of sold items of that addon.

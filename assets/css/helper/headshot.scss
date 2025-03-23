@@ -1,0 +1,19 @@
+@import "variables";
+
+.sidebar .nav-item a {
+  color: lighten($main-color, 15%);
+}
+
+ul.lan-list {
+  list-style-type: none;
+
+  li::before {
+    content: "•";
+    color: $main-color;
+    display: inline-block;
+    width: 1rem;
+    margin-left: -1rem;
+    font-size: 1.5rem;
+    line-height: 1rem;
+  }
+}

@@ -28,7 +28,7 @@ class SeatmapController extends AbstractController
     }
 
     #[Route(path: '', name: '')]
-    public function index(): Response
+    public function index(Request $request): Response
     {
         if (!$this->settingService->get('lan.seatmap.enabled', false)) {
             if ($this->settingService->get('lan.signup.enabled', false)) {
@@ -42,12 +42,15 @@ class SeatmapController extends AbstractController
 
         $seats = $this->seatmapService->getSeatmap();
         $dim = $this->seatmapService->getDimension();
+        $printView = intval($request->query->get('print'));
+
 
         return $this->render('site/seatmap/index.html.twig', [
             'seatmap' => $seats,
             'dim' => $dim,
             'users' => $this->seatmapService->getSeatedUser($seats),
             'clans' => $this->seatmapService->getReservedClans($seats),
+            'printView' => $printView,
         ]);
     }
 

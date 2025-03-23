@@ -82,6 +82,15 @@
                                     "
                                     data-chair-position="{{ seat.chairPosition.value }}" data-toggle="ajaxModal"
                                     data-html="true" title="{{ include('site/seatmap/tooltip.html.twig') }}" href="{{ path('seatmap_seat_show', {'id' : seat.id}) }}"></a>
+                                    {% if taken %}
+                                    {% if printView %}
+                                        {% if seat.id in users | keys and users[seat.id] is not empty %}
+                                        <div style="text-align: {{ users[seat.id].nickname|length > 12 ? 'left': 'center' }}">
+                                            <span class="seat-nickname">{{ users[seat.id].nickname }}</span>
+                                        </div>
+                                        {% endif %}
+                                    {% endif %}
+                                    {% endif %}
                             {% endif %}
                         {% endfor %}
                     </div>
@@ -105,6 +114,28 @@
             --seatmap-seat-bullet-size: {{ settings.get('lan.seatmap.styles.seat_bullet_size') }}px;
             --seatmap-seat-border-radius: {{ settings.get('lan.seatmap.styles.seat_border_radius', 10) }}px;
         }
+        {% if printView %}
+        .seat-nickname {
+            color: black;
+            font-size: 7px;
+        }
+        .seatmap-wrapper {
+            background: white;
+        }
+        .seatmap-wrapper .seat {
+            border: 1px solid #555 !important;
+            background: white !important;
+            overflow: hidden !important;
+        }
+        .seat .seat-information {
+            border: none !important;
+            color: #aeaeae !important;
+        }
+        .seatmap-wrapper .seat-information .fa-info-circle {
+            color: #aeaeae !important;
+        }
+    
+        {% endif %}
     </style>
     {{ encore_entry_link_tags('seatmap') }}
 {% endblock %}

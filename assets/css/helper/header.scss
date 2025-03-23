@@ -15,23 +15,29 @@
         color:$header-color;
 
         .logo {
-            max-height: 5.5rem;
+/*
+            max-height: 6rem;
             margin-bottom: 1.5rem;
 
             &.logo-full-height {
-                max-height: 10.5rem
+                max-height: 10.5rem;
             }
+*/
+            max-height: 5rem;
         }
     }
 
     &.startpage {
         height: 16rem;
         .head-content .logo {
-            max-height: 5.5rem;
+/*
+            max-height: 5rem;
 
             &.logo-full-height {
                 max-height: 14.5rem
             }
+*/
+            max-height: 4rem;
         }
     }
 }
@@ -42,16 +48,19 @@
     #header .head-wrap {
         height: 12rem;
         .head-content .logo {
-            max-height: 8rem;
+            max-height: 5rem;
         }
         &.startpage {
             height: 16rem;
             .head-content .logo {
-                max-height: 10rem;
+/*
+                max-height: 7rem;
 
                 &.logo-full-height {
                     max-height: 14.5rem
                 }
+*/
+                max-height: 5rem;
             }
         }
     }
@@ -62,20 +71,26 @@
     #header .head-wrap {
         height: 12rem;
         .head-content .logo {
-            max-height: 9rem;
+/*
+            max-height: 5rem;
 
             &.logo-full-height {
                 max-height: 10.5rem
             }
+*/
+            max-height: 3rem;
         }
         &.startpage {
             height: 23rem;
             .head-content .logo {
-                max-height: 16rem;
+/*
+                max-height: 10rem;
 
                 &.logo-full-height {
                     max-height: 21.5rem
                 }
+*/
+                max-height: 6rem;
             }
         }
     }
