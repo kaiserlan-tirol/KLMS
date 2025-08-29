@@ -1,0 +1,178 @@
+{% extends 'site/siteBase.html.twig' %}
+
+{% block title %}Catering Dashboard{% endblock %}
+
+{% block main %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1>Catering Dashboard</h1>
+                   
+                    <div class="alert alert-success mt-2">
+                        <strong>{{ has_open_orders ? 'Mein Guthaben:' : 'Guthaben:' }}</strong> {{ (credit_balance/100) | format_currency('EUR') }}
+                    </div>
+                </div>
+                <div>
+                    {#
+                    <a href="{{ path('catering_order') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Neue Bestellung
+                    </a>
+                    #}
+                    <a href="{{ path('catering_menu') }}" class="btn btn-secondary">
+                        <i class="fas fa-utensils"></i> Speisekarte
+                    </a>
+                    <a href="{{ path('catering_credit') }}" class="btn btn-info">
+                        <i class="fas fa-wallet"></i> Guthaben & Transaktionen
+                    </a>
+                </div>
+            </div>
+            
+            {% if has_open_orders %}
+                <div class="card mb-4">
+                    <div class="card-header alert-warning">
+                        <h5 class="mb-0 mt-3">Offene Posten bezahlen</h5>
+                        <p>Du hast offene Bestellungen im Wert von <strong>{{ (total_open_orders/100) | format_currency('EUR') }}</strong>. Diese kannst du hier gesammelt bezahlen.</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-4">
+                                <h6>Bezahlen per PayPal</h6>
+                                <p>Klicke auf den Link unten, um direkt zu PayPal zu gelangen:</p>
+                                <a href="https://paypal.me/kaiserlantirol/{{ (total_open_orders/100)|number_format(2, '.', '') }}EUR" target="_blank" class="btn btn-primary mb-3 p-3 px-4" style="background-color: #0070ba; border-color: #0070ba;">
+                                    <i class="fab fa-paypal"></i> Mit PayPal bezahlen ({{ (total_open_orders/100) | format_currency('EUR') }})
+                                </a>
+                            </div>
+                            
+                            <div class="col-md-6 mb-4">
+                                <div class="row">
+                                    <div class="col-md-7">
+                                        <h6>Bezahlen per Überweisung</h6>
+                                        <p class="mb-2"><strong>IBAN:</strong> LT863250018735876769</p>
+                                        <p class="mb-2"><strong>BIC:</strong> REVOLT21</p>
+                                        <p class="mb-2">
+                                            <strong>Verwendungszweck:</strong> 
+                                            {{ app.user.user.nickname }}, Catering
+                                        </p>
+                                        <p class="mb-2"><strong>Betrag:</strong> {{ (total_open_orders/100) | format_currency('EUR') }}</p>
+                                    </div>
+                                    <div class="col-md-5 text-center">
+                                        <h6 class="mb-3">Banking QR-Code</h6>
+                                        <img 
+                                            src="data:image/png;base64,{{ qr_code_data_uri('BCD\n001\n1\nSCT\nREVOLT21\nKaiserLAN Edenhauser\nLT863250018735876769\nEUR' ~ (total_open_orders/100) ~ '\n\n' ~ app.user.user.nickname ~ ', Catering')|replace({'data:image/png;base64,': ''}) }}" 
+                                            alt="QR-Code für Überweisung" 
+                                            class="img-fluid rounded"
+                                            title="Scan mit Banking-App für einfache Überweisung"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="alert alert-warning">
+                                    <h5 class="mb-2"><i class="fas fa-info-circle"></i> Zahlung bereits gesendet?</h5>
+                                    <p>Wenn du die Zahlung bereits getätigt hast, kannst du deine Bestellung(en) als "Zahlung gesendet" markieren. Dies informiert die Admins, dass eine Zahlung erfolgt ist und überprüft werden sollte.</p>
+                                    
+                                    <form action="{{ path('catering_payment_sent') }}" method="POST">
+                                        <input type="hidden" name="_token" value="{{ csrf_token(csrf_token_pay) }}">
+                                        <button type="submit" class="btn btn-warning">
+                                            <i class="fas fa-check-circle"></i> Zahlung als gesendet markieren
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+            
+            {% if orders | length > 0 %}
+                {% for order in orders %}
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Bestellung #{{ order.id }}</h5>
+                            <div>
+                                {% if order.isOpen %}
+                                    <span class="badge badge-warning">Offen</span>
+                                {% elseif order.isPaymentSent %}
+                                    <span class="badge badge-info">Zahlung gesendet</span>
+                                {% elseif order.isActive %}
+                                    <span class="badge badge-success">Bezahlt</span>
+                                {% elseif order.isCanceled %}
+                                    <span class="badge badge-secondary">Storniert</span>
+                                {% elseif order.isRefunded %}
+                                    <span class="badge badge-info">Rückerstattet</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <p><strong>Bestellt am:</strong> {{ order.createdAt | date('d.m.Y H:i') }}</p>
+                                    
+                                    <h6>Bestellte Artikel:</h6>
+                                    <table class="table table-sm">
+                                        {% for position in order.cateringOrderPositions %}
+                                            <tr>
+                                                <td>{{ position.productName }}</td>
+                                                <td class="text-center">{{ position.quantity }}x</td>
+                                                <td class="text-right">{{ (position.totalPrice/100) | format_currency('EUR') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                        <tr class="font-weight-bold">
+                                            <td colspan="2">Gesamt</td>
+                                            <td class="text-right">{{ (order.calculateTotal/100) | format_currency('EUR') }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-4">
+                                    <p class="mb-1">
+                                        <strong>{{ order.totalItems }}</strong> Artikel
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>{{ (order.calculateTotal/100) | format_currency('EUR') }}</strong>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    Du hast noch keine Catering-Bestellungen aufgegeben.
+                    <a href="{{ path('catering_order') }}" class="alert-link">Jetzt bestellen!</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add tracking for PayPal payment link clicks
+        const paypalLink = document.querySelector('a[href^="https://paypal.me"]');
+        if (paypalLink) {
+            paypalLink.addEventListener('click', function() {
+                // Tracking for payment clicks - optional
+                if (typeof gtag === 'function') {
+                    gtag('event', 'payment_initiated', {
+                        'method': 'paypal',
+                        'amount': '{{ (total_open_orders/100)|number_format(2, '.', '') }}'
+                    });
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

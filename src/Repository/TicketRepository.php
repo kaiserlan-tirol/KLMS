@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Ticket;
+use App\Entity\ShopOrderPositionAddon;
 use App\Service\TicketState;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -67,11 +68,15 @@ class TicketRepository extends ServiceEntityRepository
 
     /**
      * Get all Ticket which are in the state or in a later state
+     * @param TicketState $state
+     * @param int|null $addonFilter Filter by addon ID
      * @return Ticket[]
      */
-    public function findByState(TicketState $state): array
+    public function findByState(TicketState $state, ?int $addonFilter = null): array
     {
         $qb = $this->createQueryBuilder('t');
+        
+        // Apply state filter
         switch ($state) {
             case TicketState::PUNCHED:
                 $qb->andWhere('t.punchedAt IS NOT NULL');
@@ -82,7 +87,35 @@ class TicketRepository extends ServiceEntityRepository
             case TicketState::NEW:
                 break;
         }
+        
+        // Apply addon filter if specified
+        if ($addonFilter !== null) {
+            $qb->join('t.shopOrderPosition', 'sop')
+               ->join('sop.addons', 'addon')
+               ->andWhere('addon.addon = :addonId')
+               ->setParameter('addonId', $addonFilter);
+        }
+        
         return $qb->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Get all existing catering QR codes for collision checking
+     * @return array List of all cateringQrCode values that are already in use
+     */
+    public function findAllCateringQrCodes(): array
+    {
+        $result = $this->createQueryBuilder('t')
+            ->select('t.cateringQrCode')
+            ->where('t.cateringQrCode IS NOT NULL')
+            ->getQuery()
+            ->getArrayResult();
+        
+        // Extract just the codes into a flat array
+        return array_map(
+            function($item) { return $item['cateringQrCode']; }, 
+            $result
+        );
     }
 }

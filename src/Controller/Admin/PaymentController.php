@@ -2,12 +2,15 @@
 
 namespace App\Controller\Admin;
 
+use App\Entity\ShopAddon;
 use App\Entity\Ticket;
 use App\Exception\TicketLivecycleException;
 use App\Form\UserSelectType;
+use App\Service\ShopService;
 use App\Service\TicketService;
 use App\Service\TicketState;
 use App\Service\UserService;
+use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\UuidInterface;
 
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
@@ -25,13 +28,18 @@ class PaymentController extends AbstractController
 {
     private readonly TicketService $ticketService;
     private readonly UserService $userService;
+    private readonly ShopService $shopService;
+    private readonly EntityManagerInterface $em;
 
     public function __construct(TicketService $ticketService,
-                                UserService   $userService)
+                                UserService   $userService,
+                                ShopService   $shopService,
+                                EntityManagerInterface $em)
     {
         $this->ticketService = $ticketService;
         $this->userService = $userService;
-        // $this->userRepo = $manager->getRepository(User::class);
+        $this->shopService = $shopService;
+        $this->em = $em;
     }
 
     private function createTicketCreateForm(string $action = "", bool $forceUser = false): FormInterface
@@ -54,11 +62,31 @@ class PaymentController extends AbstractController
                 if ($can_delete_ticket) $form->add('delete', SubmitType::class);
                 break;
             case TicketState::REDEEMED:
+                $form->add('cateringQrCode', \Symfony\Component\Form\Extension\Core\Type\TextType::class, [
+                    'required' => false,
+                    'label' => 'Catering QR Code',
+                    'data' => $ticket->getCateringQrCode(),
+                    'attr' => [
+                        'class' => 'form-control', 
+                        'placeholder' => 'Enter Catering QR Code',
+                        'style' => 'text-transform: uppercase;'
+                    ]
+                ]);
                 $form->add('unassign', SubmitType::class);
                 $form->add('punch', SubmitType::class);
                 if ($can_delete_ticket) $form->add('delete', SubmitType::class);
                 break;
             case TicketState::PUNCHED:
+                $form->add('cateringQrCode', \Symfony\Component\Form\Extension\Core\Type\TextType::class, [
+                    'required' => false,
+                    'label' => 'Catering QR Code',
+                    'data' => $ticket->getCateringQrCode(),
+                    'attr' => [
+                        'class' => 'form-control', 
+                        'placeholder' => 'Enter Catering QR Code',
+                        'style' => 'text-transform: uppercase;'
+                    ]
+                ]);
                 $form->add('unpunch', SubmitType::class);
                 $form->add('unassign', SubmitType::class);
                 if ($can_delete_ticket) $form->add('delete', SubmitType::class);
@@ -70,39 +98,23 @@ class PaymentController extends AbstractController
     #[Route(path: '', name: '', methods: ['GET'])]
     public function index(Request $request): Response
     {
-
-        $tickets = $this->ticketService->queryTickets();
+        $addonFilter = $request->query->get('addon');
+        $addonFilterId = $addonFilter ? (int)$addonFilter : null;
+        
+        $tickets = $this->ticketService->queryTickets(addonFilter: $addonFilterId);
+        
         $uuids = array_map(fn (Ticket $t) => $t->getRedeemer(), $tickets);
         $uuids = array_filter($uuids, fn (?UuidInterface $uuid) => !empty($uuid));
         $users = $this->userService->getUsers($uuids, assoc: true);
-/*
-        $gamers = $this->gamerService->getGamers();
-        $printDogTags = intval($request->query->get('dogtags')) === 1;
-        if ($printDogTags) {
-
-            $dogtagGamers = array_map(fn ($g) => [
-              'id' => $g['user']->getId(),
-              'uuid' => $g['user']->getUuid()->toString(),
-              'paid' => $g['status']->hasPaid(),
-              'registered' => $g['status']->getRegistered(),
-              'nickname' => $g['user']->getNickname(),
-            ], $gamers);
-
-            usort($dogtagGamers, function ($a, $b) {
-              return $b['registered'] <=> $a['registered'];
-            });
-
-            $dogtagGamers = array_reverse($dogtagGamers);
-
-            return $this->render('admin/payment/dogtags.html.twig', [
-                'gamers' => $dogtagGamers,
-            ]);
-        }
-*/
+        
+        // Get all available addons for the filter dropdown
+        $addons = $this->shopService->getAddons(all: true);
 
         return $this->render('admin/payment/index.html.twig', [
             'tickets' => $tickets,
             'users' => $users,
+            'addons' => $addons,
+            'selectedAddon' => $addonFilterId,
             'form_add' => $this->createTicketCreateForm("add", true)->createView(),
             'form_new' => $this->createTicketCreateForm("new", false)->createView(),
         ]);
@@ -175,6 +187,16 @@ class PaymentController extends AbstractController
                         $this->ticketService->unassignTicket($ticket);
                         break;
                     case self::clickedIfExists($form, 'punch'):
+                        // Check if catering QR code is entered for punching
+                        if ($form->has('cateringQrCode')) {
+                            $cateringQrCode = strtoupper($form->get('cateringQrCode')->getData());
+                            if (empty($cateringQrCode)) {
+                                $error = "Catering QR Code ist erforderlich.";
+                                break;
+                            }
+                            $ticket->setCateringQrCode($cateringQrCode);
+                            $this->em->persist($ticket);
+                        }
                         $this->ticketService->punchTicket($ticket);
                         break;
                     case self::clickedIfExists($form, 'unpunch'):
@@ -183,14 +205,6 @@ class PaymentController extends AbstractController
                     case self::clickedIfExists($form, 'delete'):
                         $this->ticketService->deleteTicket($ticket);
                         break;
-                        /*
-                  case self::clickedIfExists($form, 'pay_toastflat'):
-                    $this->ticketService->gamerPayToastflat($user);
-                    break;
-                  case self::clickedIfExists($form, 'unpay_toastflat'):
-                    $this->gamerService->gamerUnPayToastflat($user);
-                    break;
-                        */
                     default:
                         $this->addFlash('error', "Aktion konnte nicht durchgeführt werden");
                         return $this->redirectToRoute('admin_payment');
