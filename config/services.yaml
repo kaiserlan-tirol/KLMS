@@ -35,6 +35,16 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+    
+    # Email fetcher service configuration
+    App\Service\EmailFetcherService:
+        arguments:
+            $host: '%env(EMAIL_IMAP_HOST)%'
+            $port: '%env(int:EMAIL_IMAP_PORT)%'
+            $username: '%env(EMAIL_IMAP_USERNAME)%'
+            $password: '%env(EMAIL_IMAP_PASSWORD)%'
+            $encryption: '%env(EMAIL_IMAP_ENCRYPTION)%'
+            $folder: '%env(EMAIL_IMAP_FOLDER)%'
 
 when@test:
     # add services in the test directory to be injected for testing

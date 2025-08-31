@@ -178,4 +178,22 @@ class IncomingPaymentRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Find matched but unprocessed payments with pagination
+     */
+    public function findMatchedUnprocessedPaginated(int $page = 1, int $limit = 50): array
+    {
+        $offset = ($page - 1) * $limit;
+        
+        return $this->createQueryBuilder('p')
+            ->where('p.matchedUser IS NOT NULL')
+            ->andWhere('p.status != :processed')
+            ->setParameter('processed', IncomingPayment::STATUS_PROCESSED)
+            ->orderBy('p.createdAt', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
 }

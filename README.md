@@ -25,6 +25,8 @@ Setup instructions and system requirements can be found in our [setup documentat
 ### Run website
 Once all setup steps are done start the Symfony development server using
 ```
+# local kaiserlan.at gmail creds for email checking
+export EMAIL_IMAP_PASSWORD=`security find-generic-password -s kaiserlan-imap -w`
 XDEBUG_MODE=debug symfony server:start --port=8002 --no-tls
 ```
 Open the printed URL in your browser and log in with a superuser credential 

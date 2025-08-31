@@ -120,6 +120,11 @@ class IncomingPayment
         return (float) $this->amount;
     }
 
+    public function getAmountInCents(): int
+    {
+        return (int) round($this->getAmountAsFloat() * 100);
+    }
+
     public function getCurrency(): string
     {
         return $this->currency;

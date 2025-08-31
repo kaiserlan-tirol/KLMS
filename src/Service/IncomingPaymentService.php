@@ -19,8 +19,7 @@ class IncomingPaymentService
     private readonly IdmRepository $userRepo;
     private readonly LoggerInterface $logger;
     private readonly PaymentMatchingService $paymentMatchingService;
-    private readonly ShopService $shopService;
-    private readonly CateringService $cateringService;
+    private readonly PaymentProcessingService $paymentProcessingService;
 
     public function __construct(
         IncomingPaymentRepository $paymentRepository,
@@ -28,16 +27,14 @@ class IncomingPaymentService
         IdmManager $idmManager,
         LoggerInterface $logger,
         PaymentMatchingService $paymentMatchingService,
-        ShopService $shopService,
-        CateringService $cateringService
+        PaymentProcessingService $paymentProcessingService
     ) {
         $this->paymentRepository = $paymentRepository;
         $this->em = $em;
         $this->userRepo = $idmManager->getRepository(User::class);
         $this->logger = $logger;
         $this->paymentMatchingService = $paymentMatchingService;
-        $this->shopService = $shopService;
-        $this->cateringService = $cateringService;
+        $this->paymentProcessingService = $paymentProcessingService;
     }
 
     public function createIncomingPayment(
@@ -104,7 +101,7 @@ class IncomingPaymentService
         return $payment;
     }
 
-    public function processPayment(IncomingPayment $payment, ?UuidInterface $processedBy = null): void
+    public function processPayment(IncomingPayment $payment, ?UuidInterface $processedBy = null): array
     {
         if ($payment->isProcessed()) {
             throw new \InvalidArgumentException('Payment is already processed');
@@ -114,6 +111,10 @@ class IncomingPaymentService
             throw new \InvalidArgumentException('Payment must be matched to a user before processing');
         }
 
+        // Use the dedicated payment processing service
+        $result = $this->paymentProcessingService->processPayment($payment);
+        
+        // Update payment status
         $payment->setStatus(IncomingPayment::STATUS_PROCESSED);
         $payment->setProcessedBy($processedBy);
         $payment->setProcessedAt(new DateTimeImmutable());
@@ -123,8 +124,11 @@ class IncomingPaymentService
         $this->logger->info('Payment processed', [
             'payment_id' => $payment->getId(),
             'user_id' => $payment->getMatchedUser()->toString(),
-            'processed_by' => $processedBy?->toString()
+            'processed_by' => $processedBy?->toString(),
+            'result' => $result
         ]);
+        
+        return $result;
     }
 
     public function matchPaymentToUser(IncomingPayment $payment, UuidInterface $userId, string $confidence = IncomingPayment::CONFIDENCE_MANUAL, ?string $notes = null): void
@@ -196,6 +200,14 @@ class IncomingPaymentService
     }
 
     /**
+     * Get matched but unprocessed payments with pagination
+     */
+    public function getMatchedUnprocessedPayments(int $page = 1, int $limit = 50): array
+    {
+        return $this->paymentRepository->findMatchedUnprocessedPaginated($page, $limit);
+    }
+
+    /**
      * Get processed payments with pagination
      */
     public function getProcessedPayments(int $page = 1, int $limit = 50): array
@@ -230,20 +242,17 @@ class IncomingPaymentService
      */
     public function createPayment(
         float $amount,
+        string $currency,
+        DateTimeImmutable $timestamp,
         string $source,
-        string $reference = '',
-        string $senderInfo = '',
         array $metadata = []
     ): IncomingPayment {
         return $this->createIncomingPayment(
             $amount,
-            'EUR',
-            new DateTimeImmutable(),
+            $currency,
+            $timestamp,
             $source,
-            array_merge($metadata, [
-                'reference' => $reference,
-                'senderInfo' => $senderInfo
-            ])
+            $metadata
         );
     }
 
@@ -320,17 +329,24 @@ class IncomingPaymentService
                 return;
             }
 
-            // Step 2: If matched to user, try to match to specific orders
-            $user = $this->userRepo->findOneById($payment->getMatchedUser());
-            if (!$user) {
-                $this->logger->warning('Matched user not found', [
+            // Step 2: If matched to user with high confidence, process the payment automatically
+            if ($payment->getMatchConfidence() === IncomingPayment::CONFIDENCE_HIGH) {
+                // Process the payment through the payment processing service
+                $this->paymentProcessingService->processPayment($payment);
+                
+                $this->logger->info('Payment automatically processed', [
                     'payment_id' => $payment->getId(),
-                    'user_id' => $payment->getMatchedUser()->toString()
+                    'user_id' => $payment->getMatchedUser()->toString(),
+                    'confidence' => $payment->getMatchConfidence()
                 ]);
-                return;
+            } else {
+                // Medium/low confidence - keep as matched but require manual review
+                $this->logger->info('Payment matched with lower confidence - requires manual review', [
+                    'payment_id' => $payment->getId(),
+                    'user_id' => $payment->getMatchedUser()->toString(),
+                    'confidence' => $payment->getMatchConfidence()
+                ]);
             }
-
-            $this->tryMatchToOrders($payment, $user);
 
         } catch (\Exception $e) {
             $this->logger->error('Error during automatic payment matching', [
@@ -341,328 +357,10 @@ class IncomingPaymentService
     }
 
     /**
-     * Try to match payment to specific orders based on amount and order IDs
+     * Check if a payment with the given external ID already exists
      */
-    private function tryMatchToOrders(IncomingPayment $payment, User $user): void
+    public function paymentExistsByExternalId(string $externalId): bool
     {
-        $paymentAmount = $payment->getAmountAsFloat(); // As float
-        $reference = $payment->getReference() ?? '';
-        
-        // Try to find order ID in reference
-        $orderMatched = false;
-        
-        // Look for shop order ID patterns in reference
-        if (preg_match('/(?:order|bestellung|#)\s*(\d+)/i', $reference, $matches)) {
-            $orderId = (int) $matches[1];
-            $orderMatched = $this->tryMatchToShopOrder($payment, $user, $orderId, $paymentAmount);
-        }
-        
-        // Look for catering order patterns
-        if (!$orderMatched && preg_match('/(?:catering|food|essen)\s*(\d+)/i', $reference, $matches)) {
-            $orderId = (int) $matches[1];
-            $orderMatched = $this->tryMatchToCateringOrder($payment, $user, $orderId, $paymentAmount);
-        }
-        
-        // If no specific order found, try to match by amount
-        if (!$orderMatched) {
-            $this->tryMatchByAmount($payment, $user, $paymentAmount);
-        }
-    }
-
-    /**
-     * Try to match payment to a specific shop order
-     */
-    private function tryMatchToShopOrder(IncomingPayment $payment, User $user, int $orderId, float $paymentAmount): bool
-    {
-        try {
-            // Find the specific shop order
-            $shopOrders = $this->shopService->getOrderByUser($user, \App\Entity\ShopOrderStatus::Created);
-            $targetOrder = null;
-            
-            foreach ($shopOrders as $order) {
-                if ($order->getId() === $orderId) {
-                    $targetOrder = $order;
-                    break;
-                }
-            }
-            
-            if (!$targetOrder) {
-                $this->logger->debug('Shop order not found or not open', [
-                    'payment_id' => $payment->getId(),
-                    'order_id' => $orderId,
-                    'user_id' => $user->getUuid()->toString()
-                ]);
-                return false;
-            }
-            
-            $orderTotal = $targetOrder->calculateTotal();
-            
-            // Check if amount matches exactly or is close enough (within 5%)
-            $amountDifference = abs($paymentAmount - $orderTotal);
-            $tolerance = max(50, $orderTotal * 0.05); // 50 cents or 5%, whichever is larger
-            
-            if ($amountDifference <= $tolerance) {
-                // Mark the order as paid
-                $this->shopService->setOrderPaid($targetOrder);
-                
-                $this->addProcessingNote($payment, sprintf(
-                    'Auto-matched to shop order #%d (%.2f € vs %.2f €) - Order marked as PAID',
-                    $orderId,
-                    $paymentAmount / 100,
-                    $orderTotal / 100
-                ));
-                
-                $payment->setStatus(IncomingPayment::STATUS_PROCESSED);
-                $payment->setProcessedAt(new DateTimeImmutable());
-                
-                $this->logger->info('Payment auto-matched to specific shop order and marked as paid', [
-                    'payment_id' => $payment->getId(),
-                    'order_id' => $orderId,
-                    'payment_amount' => $paymentAmount,
-                    'order_amount' => $orderTotal
-                ]);
-                
-                return true;
-            }
-        } catch (\Exception $e) {
-            $this->logger->error('Error matching to shop order', [
-                'payment_id' => $payment->getId(),
-                'order_id' => $orderId,
-                'error' => $e->getMessage()
-            ]);
-        }
-        
-        return false;
-    }
-
-    /**
-     * Try to match payment to a specific catering order
-     */
-    private function tryMatchToCateringOrder(IncomingPayment $payment, User $user, int $orderId, float $paymentAmount): bool
-    {
-        try {
-            // Find the specific catering order
-            $cateringOrders = $this->cateringService->getOrderByUser($user, \App\Entity\CateringOrderStatus::Created);
-            $targetOrder = null;
-            
-            foreach ($cateringOrders as $order) {
-                if ($order->getId() === $orderId) {
-                    $targetOrder = $order;
-                    break;
-                }
-            }
-            
-            if (!$targetOrder) {
-                $this->logger->debug('Catering order not found or not open', [
-                    'payment_id' => $payment->getId(),
-                    'order_id' => $orderId,
-                    'user_id' => $user->getUuid()->toString()
-                ]);
-                return false;
-            }
-            
-            $orderTotal = $targetOrder->calculateTotal();
-            
-            // Check if amount matches exactly or is close enough (within 5%)
-            $amountDifference = abs($paymentAmount - $orderTotal);
-            $tolerance = max(50, $orderTotal * 0.05); // 50 cents or 5%, whichever is larger
-            
-            if ($amountDifference <= $tolerance) {
-                // Mark the order as paid
-                $this->cateringService->setOrderPaid($targetOrder);
-                
-                $this->addProcessingNote($payment, sprintf(
-                    'Auto-matched to catering order #%d (%.2f € vs %.2f €) - Order marked as PAID',
-                    $orderId,
-                    $paymentAmount / 100,
-                    $orderTotal / 100
-                ));
-                
-                $payment->setStatus(IncomingPayment::STATUS_PROCESSED);
-                $payment->setProcessedAt(new DateTimeImmutable());
-                
-                $this->logger->info('Payment auto-matched to specific catering order and marked as paid', [
-                    'payment_id' => $payment->getId(),
-                    'order_id' => $orderId,
-                    'payment_amount' => $paymentAmount,
-                    'order_amount' => $orderTotal
-                ]);
-                
-                return true;
-            }
-        } catch (\Exception $e) {
-            $this->logger->error('Error matching to catering order', [
-                'payment_id' => $payment->getId(),
-                'order_id' => $orderId,
-                'error' => $e->getMessage()
-            ]);
-        }
-        
-        return false;
-    }
-
-    /**
-     * Try to match payment by amount to open orders
-     */
-    private function tryMatchByAmount(IncomingPayment $payment, User $user, float $paymentAmount): void
-    {
-        try {
-            // Get all open orders for the user
-            $shopOrders = $this->shopService->getOrderByUser($user, \App\Entity\ShopOrderStatus::Created);
-            $cateringOrders = $this->cateringService->getOrderByUser($user, \App\Entity\CateringOrderStatus::Created);
-            $cateringPaymentSentOrders = $this->cateringService->getOrderByUser($user, \App\Entity\CateringOrderStatus::PaymentSent);
-            
-            $allOrders = [];
-            
-            // Add shop orders
-            foreach ($shopOrders as $order) {
-                $allOrders[] = [
-                    'type' => 'shop',
-                    'order' => $order,
-                    'amount' => $order->calculateTotal(),
-                    'id' => $order->getId()
-                ];
-            }
-            
-            // Add catering orders (both Created and PaymentSent)
-            foreach (array_merge($cateringOrders, $cateringPaymentSentOrders) as $order) {
-                $allOrders[] = [
-                    'type' => 'catering',
-                    'order' => $order,
-                    'amount' => $order->calculateTotal(),
-                    'id' => $order->getId()
-                ];
-            }
-            
-            if (empty($allOrders)) {
-                // No orders found - add as catering credit
-                $this->addCateringCredit($payment, $user, $paymentAmount);
-                return;
-            }
-            
-            // Sort by amount difference (closest match first)
-            usort($allOrders, function($a, $b) use ($paymentAmount) {
-                $diffA = abs($a['amount'] - $paymentAmount);
-                $diffB = abs($b['amount'] - $paymentAmount);
-                return $diffA <=> $diffB;
-            });
-            
-            $bestMatch = $allOrders[0];
-            $amountDifference = abs($bestMatch['amount'] - $paymentAmount);
-            $tolerance = max(100, $bestMatch['amount'] * 0.1); // 1 € or 10%, whichever is larger
-            
-            if ($amountDifference <= $tolerance) {
-                // Good match found - mark the order as paid
-                if ($bestMatch['type'] === 'shop') {
-                    $this->shopService->setOrderPaid($bestMatch['order']);
-                } else {
-                    $this->cateringService->setOrderPaid($bestMatch['order']);
-                }
-                
-                $this->addProcessingNote($payment, sprintf(
-                    'Auto-matched to %s order #%d by amount (%.2f € vs %.2f €, diff: %.2f €) - Order marked as PAID',
-                    $bestMatch['type'],
-                    $bestMatch['id'],
-                    $paymentAmount / 100,
-                    $bestMatch['amount'] / 100,
-                    $amountDifference / 100
-                ));
-                
-                $payment->setStatus(IncomingPayment::STATUS_PROCESSED);
-                $payment->setProcessedAt(new DateTimeImmutable());
-                
-                $this->logger->info('Payment auto-matched to order by amount and marked as paid', [
-                    'payment_id' => $payment->getId(),
-                    'order_type' => $bestMatch['type'],
-                    'order_id' => $bestMatch['id'],
-                    'payment_amount' => $paymentAmount,
-                    'order_amount' => $bestMatch['amount']
-                ]);
-            } else {
-                // Calculate total of all orders
-                $totalOpenAmount = array_sum(array_column($allOrders, 'amount'));
-                
-                if ($paymentAmount >= $totalOpenAmount * 0.8) { // If payment covers at least 80% of all orders
-                    $orderList = implode(', ', array_map(fn($o) => $o['type'] . ' #' . $o['id'], array_slice($allOrders, 0, 3)));
-                    if (count($allOrders) > 3) {
-                        $orderList .= ' + ' . (count($allOrders) - 3) . ' more';
-                    }
-                    
-                    $this->addProcessingNote($payment, sprintf(
-                        'Likely payment for multiple orders: %s (total: %.2f €) - Requires manual review',
-                        $orderList,
-                        $totalOpenAmount / 100
-                    ));
-                } else {
-                    // Amount doesn't match any specific order - add as catering credit
-                    $this->addCateringCredit($payment, $user, $paymentAmount);
-                }
-            }
-            
-        } catch (\Exception $e) {
-            $this->logger->error('Error matching payment by amount', [
-                'payment_id' => $payment->getId(),
-                'user_id' => $user->getUuid()->toString(),
-                'error' => $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Add a processing note to the payment
-     */
-    private function addProcessingNote(IncomingPayment $payment, string $note): void
-    {
-        $existingNotes = $payment->getProcessingNotes();
-        $newNotes = $existingNotes ? $existingNotes . "\n" . $note : $note;
-        $payment->setProcessingNotes($newNotes);
-    }
-
-    /**
-     * Add payment as catering credit to the user
-     */
-    private function addCateringCredit(IncomingPayment $payment, User $user, int $paymentAmount): void
-    {
-        try {
-            // Add credit to user's catering account
-            $this->cateringService->addUserCredit(
-                $user,
-                $paymentAmount,
-                sprintf(
-                    'Zahlung erhalten: %.2f € (Payment ID: %s)',
-                    $paymentAmount / 100,
-                    $payment->getId()
-                )
-            );
-            
-            $this->addProcessingNote($payment, sprintf(
-                'Added %.2f € as catering credit - No matching order found',
-                $paymentAmount / 100
-            ));
-            
-            $payment->setStatus(IncomingPayment::STATUS_PROCESSED);
-            $payment->setProcessedAt(new DateTimeImmutable());
-            
-            $this->logger->info('Payment added as catering credit', [
-                'payment_id' => $payment->getId(),
-                'user_id' => $user->getUuid()->toString(),
-                'amount' => $paymentAmount
-            ]);
-            
-        } catch (\Exception $e) {
-            $this->logger->error('Error adding catering credit', [
-                'payment_id' => $payment->getId(),
-                'user_id' => $user->getUuid()->toString(),
-                'amount' => $paymentAmount,
-                'error' => $e->getMessage()
-            ]);
-            
-            // Fallback to manual review
-            $this->addProcessingNote($payment, sprintf(
-                'ERROR: Could not add %.2f € as catering credit - Requires manual review. Error: %s',
-                $paymentAmount / 100,
-                $e->getMessage()
-            ));
-        }
+        return $this->paymentRepository->findOneBy(['externalId' => $externalId]) !== null;
     }
 }

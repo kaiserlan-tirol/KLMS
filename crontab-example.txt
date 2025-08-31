@@ -1,0 +1,26 @@
+# Auto Payment Processing Crontab
+# This cronjob runs every 4 hours to fetch and process PayPal payments
+# 
+# Schedule: Every 4 hours (at 00:00, 04:00, 08:00, 12:00, 16:00, 20:00)
+# Logs are written to: var/log/auto-payment-processing.log
+#
+# To install this crontab:
+# 1. Edit your crontab: crontab -e
+# 2. Add the line below (adjust the path to match your installation):
+
+0 */4 * * * /Users/markuse/projects/privat/privat/kaiserlan.at/webseite/kaiserlan.at/bin/auto-process-payments.sh
+
+# Alternative schedules (choose one):
+#
+# Every 2 hours:
+# 0 */2 * * * /Users/markuse/projects/privat/privat/kaiserlan.at/webseite/kaiserlan.at/bin/auto-process-payments.sh
+#
+# Twice daily (8 AM and 8 PM):
+# 0 8,20 * * * /Users/markuse/projects/privat/privat/kaiserlan.at/webseite/kaiserlan.at/bin/auto-process-payments.sh
+#
+# Every hour during business hours (8 AM to 8 PM):
+# 0 8-20 * * * /Users/markuse/projects/privat/privat/kaiserlan.at/webseite/kaiserlan.at/bin/auto-process-payments.sh
+
+# To view current crontab: crontab -l
+# To remove crontab: crontab -r
+# To check if cron service is running: sudo service cron status (Linux) or launchctl list | grep cron (macOS)

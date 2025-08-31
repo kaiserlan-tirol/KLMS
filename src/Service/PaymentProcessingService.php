@@ -38,7 +38,7 @@ class PaymentProcessingService
             throw new \InvalidArgumentException('Matched user not found');
         }
 
-        $amountInCents = $payment->getAmount();
+        $amountInCents = $payment->getAmountInCents();
         $processingNotes = [];
 
         // First, try to pay for open shop orders (tickets, addons)
@@ -70,7 +70,7 @@ class PaymentProcessingService
             'catering_orders_processed' => $cateringOrdersProcessed['orders_processed'],
             'catering_amount_used' => $cateringOrdersProcessed['amount_used'],
             'credit_added' => $creditAdded,
-            'total_amount' => $payment->getAmount(),
+            'total_amount' => $payment->getAmountInCents(),
             'processing_notes' => $processingNotes
         ];
 

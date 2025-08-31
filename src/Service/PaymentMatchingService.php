@@ -95,21 +95,12 @@ class PaymentMatchingService
         $score = 0;
         $reasons = [];
 
-        // Email matching (highest priority)
-        if ($payment->getPayerEmail()) {
+        // Email matching (highest priority) - only for non-PayPal sources
+        if ($payment->getPayerEmail() && $payment->getSource() !== IncomingPayment::SOURCE_PAYPAL) {
             // Exact email match
             if (strtolower($payment->getPayerEmail()) === strtolower($user->getEmail())) {
                 $score += 0.8;
                 $reasons[] = 'E-Mail exakte Übereinstimmung';
-            }
-            
-            // PayPal email match
-            foreach ($user->getPaypalEmails() as $paypalEmail) {
-                if (strtolower($payment->getPayerEmail()) === strtolower($paypalEmail)) {
-                    $score += 0.7;
-                    $reasons[] = 'PayPal E-Mail Übereinstimmung';
-                    break;
-                }
             }
         }
 
@@ -157,20 +148,100 @@ class PaymentMatchingService
             }
         }
 
-        // Payer name matching
+        // Payer name matching with fuzzy logic
         if ($payment->getPayerName()) {
             $payerName = strtolower($payment->getPayerName());
             $userFirstName = strtolower($user->getFirstname() ?? '');
             $userSurname = strtolower($user->getSurname() ?? '');
+            $userNickname = strtolower($user->getNickname() ?? '');
             
-            if ($userFirstName && strpos($payerName, $userFirstName) !== false) {
-                $score += 0.3;
-                $reasons[] = 'Vorname im Zahlernamen';
+            $firstNameMatch = $userFirstName && strpos($payerName, $userFirstName) !== false;
+            $surnameMatch = $userSurname && strpos($payerName, $userSurname) !== false;
+            
+            // Full name match (first + surname) should be very high confidence
+            if ($firstNameMatch && $surnameMatch) {
+                $score += 0.8;  // High score for complete name match
+                $reasons[] = 'Vollständiger Name im Zahlernamen (Vor- und Nachname)';
+            } else {
+                // Individual name matches (only if not both matched above)
+                if ($firstNameMatch) {
+                    $score += 0.3;
+                    $reasons[] = 'Vorname im Zahlernamen';
+                }
+                
+                if ($surnameMatch) {
+                    $score += 0.3;
+                    $reasons[] = 'Nachname im Zahlernamen';
+                }
             }
             
-            if ($userSurname && strpos($payerName, $userSurname) !== false) {
-                $score += 0.3;
-                $reasons[] = 'Nachname im Zahlernamen';
+            if ($userNickname && strpos($payerName, $userNickname) !== false) {
+                $score += 0.4;
+                $reasons[] = 'Nickname im Zahlernamen';
+            }
+            
+            // Fuzzy matching for full name with typos (high confidence)
+            $fullUserName = trim($userFirstName . ' ' . $userSurname);
+            if (strlen($fullUserName) > 3) {
+                $fullNameSimilarity = $this->calculateStringSimilarity($fullUserName, $payerName);
+                if ($fullNameSimilarity >= 0.85) {
+                    $score += 0.75;  // High score for fuzzy full name match
+                    $reasons[] = sprintf('Vollständiger Name sehr ähnlich (%.0f%%)', $fullNameSimilarity * 100);
+                } elseif ($fullNameSimilarity >= 0.7) {
+                    $score += 0.5;   // Medium-high score for moderate similarity
+                    $reasons[] = sprintf('Vollständiger Name ähnlich (%.0f%%)', $fullNameSimilarity * 100);
+                }
+            }
+            
+            // Individual name fuzzy matching (only if full name didn't match well)
+            if ($score < 0.7) {
+                if ($userFirstName) {
+                    $similarity = $this->calculateStringSimilarity($userFirstName, $payerName);
+                    if ($similarity >= 0.8) {
+                        $score += 0.25;
+                        $reasons[] = sprintf('Vorname ähnlich (%.0f%%)', $similarity * 100);
+                    }
+                }
+                
+                if ($userSurname) {
+                    $similarity = $this->calculateStringSimilarity($userSurname, $payerName);
+                    if ($similarity >= 0.8) {
+                        $score += 0.25;
+                        $reasons[] = sprintf('Nachname ähnlich (%.0f%%)', $similarity * 100);
+                    }
+                }
+            }
+            
+            if ($userNickname) {
+                $similarity = $this->calculateStringSimilarity($userNickname, $payerName);
+                if ($similarity >= 0.8) {
+                    $score += 0.35;
+                    $reasons[] = sprintf('Nickname ähnlich (%.0f%%)', $similarity * 100);
+                }
+            }
+            
+            // Try to match individual words in payer name
+            $payerWords = preg_split('/\s+/', $payerName);
+            foreach ($payerWords as $word) {
+                if (strlen($word) < 3) continue; // Skip short words
+                
+                if ($userFirstName && $this->calculateStringSimilarity($word, $userFirstName) >= 0.85) {
+                    $score += 0.2;
+                    $reasons[] = 'Wort im Namen ähnlich Vorname';
+                    break;
+                }
+                
+                if ($userSurname && $this->calculateStringSimilarity($word, $userSurname) >= 0.85) {
+                    $score += 0.2;
+                    $reasons[] = 'Wort im Namen ähnlich Nachname';
+                    break;
+                }
+                
+                if ($userNickname && $this->calculateStringSimilarity($word, $userNickname) >= 0.85) {
+                    $score += 0.3;
+                    $reasons[] = 'Wort im Namen ähnlich Nickname';
+                    break;
+                }
             }
         }
 
@@ -180,7 +251,7 @@ class PaymentMatchingService
     public function learnFromMatch(IncomingPayment $payment, User $user): void
     {
         // Store payment details in user profile for future matching
-        
+        // PayPal email learning removed since payer email is not reliable from PayPal notifications
         if ($payment->getPayerEmail() && $payment->getSource() === IncomingPayment::SOURCE_PAYPAL) {
             if (!$user->hasPaypalEmail($payment->getPayerEmail())) {
                 $user->addPaypalEmail($payment->getPayerEmail());
@@ -197,6 +268,13 @@ class PaymentMatchingService
                 $user->setPaymentDetailsVerifiedAt(new \DateTime());
             }
         }
+        
+        $this->logger->info('Payment matched to user', [
+            'payment_id' => $payment->getId(),
+            'user_id' => $user->getUuid()->toString(),
+            'payer_name' => $payment->getPayerName(),
+            'source' => $payment->getSource()
+        ]);
     }
 
     public function suggestMatches(IncomingPayment $payment, int $limit = 5): array
@@ -223,5 +301,36 @@ class PaymentMatchingService
         }
         
         return $users;
+    }
+
+    /**
+     * Calculate string similarity using Levenshtein distance
+     * Returns a value between 0 and 1, where 1 is identical
+     */
+    private function calculateStringSimilarity(string $str1, string $str2): float
+    {
+        if (empty($str1) || empty($str2)) {
+            return 0.0;
+        }
+        
+        // Normalize strings
+        $str1 = strtolower(trim($str1));
+        $str2 = strtolower(trim($str2));
+        
+        if ($str1 === $str2) {
+            return 1.0;
+        }
+        
+        $maxLen = max(strlen($str1), strlen($str2));
+        if ($maxLen === 0) {
+            return 1.0;
+        }
+        
+        $distance = levenshtein($str1, $str2);
+        
+        // Calculate similarity as percentage
+        $similarity = 1 - ($distance / $maxLen);
+        
+        return max(0, $similarity);
     }
 }
