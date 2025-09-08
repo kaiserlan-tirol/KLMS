@@ -36,7 +36,6 @@ public/images
 assets/images/EMail/*
 public/cache
 public/media
-*.sh
 /.php_cs
 /.php_cs.cache
 /public/media/cache/

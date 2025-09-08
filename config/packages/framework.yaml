@@ -31,6 +31,9 @@ framework:
                 headers:
                     Accept: 'application/json'
                     X-API-KEY: '%env(KLMS_IDM_APIKEY)%'
+                # SSL configuration - can be disabled in dev environments
+                verify_peer: '%env(bool:KLMS_IDM_SSL_VERIFY)%'
+                verify_host: '%env(bool:KLMS_IDM_SSL_VERIFY)%'
 
 when@test:
     framework:
