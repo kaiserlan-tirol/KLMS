@@ -18,7 +18,7 @@ class ShopOrderPositionAddon extends ShopOrderPosition
     private ?ShopAddon $addon = null;
 
     /** @var ShopOrderPositionTicket|null The ticket this addon is attached to */
-    #[ORM\ManyToOne(targetEntity: ShopOrderPositionTicket::class)]
+    #[ORM\ManyToOne(targetEntity: ShopOrderPositionTicket::class, inversedBy: 'addons')]
     #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     private ?ShopOrderPositionTicket $ticket = null;
 
