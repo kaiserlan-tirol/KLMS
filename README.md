@@ -36,6 +36,10 @@ Schema changes have to applied via:
 ```bash
 php bin/console doctrine:schema:update --force --complete
 php bin/console doctrine:schema:validate
+
+# on plesk:
+/.phpenv/versions/8.3/bin/php bin/console doctrine:schema:update --force --complete
+/.phpenv/versions/8.3/bin/php bin/console doctrine:schema:validate
 ```
 
 ### Debugging
