@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller\Site;
+namespace App\Controller\API;
 
 use App\Service\IncomingPaymentService;
 use App\Service\PaymentMatchingService;
@@ -20,7 +20,29 @@ class PaymentWebhookController extends AbstractController
     ) {
     }
 
-    #[Route('/api-secured-by-token/payment-webhook/{source}', name: 'api_payment_webhook', methods: ['POST'])]
+
+    #[Route('/secured-by-token/payment-webhook/{source}/debug', name: 'api_payment_webhook_debug', methods: ['POST'])]
+    public function receivePaymentDebug(Request $request, string $source): JsonResponse
+    {
+        // Check authentication header
+        $authHeader = $request->headers->get('X-Auth');
+        $expectedToken = $this->getParameter('payment_webhook_token');
+
+        // Process the payment webhook
+        return new JsonResponse([
+            'ip' => $request->getClientIp(),
+            'user_agent' => $request->headers->get('User-Agent'),
+            'source' => $source,
+            'authHeader' => $authHeader,
+            'expectedToken' => $expectedToken,
+            'isAuthValid' => $authHeader && hash_equals($expectedToken, $authHeader),
+            'hasAuthHeader' => !empty($authHeader),
+            'tokensMatch' => $authHeader && hash_equals($expectedToken, $authHeader)
+        ]);
+    }
+        
+
+    #[Route('/secured-by-token/payment-webhook/{source}', name: 'api_payment_webhook', methods: ['POST'])]
     public function receivePayment(Request $request, string $source): JsonResponse
     {
         // Check authentication header

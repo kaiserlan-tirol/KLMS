@@ -26,6 +26,7 @@ class FetchPaymentEmailsCommand extends Command
         private readonly PayPalImportService $paypalImportService,
         private readonly EmailFetcherService $emailFetcherService,
         private readonly PayPalEmailProcessorService $paypalEmailProcessor,
+        private readonly string $projectDir,
     ) {
         parent::__construct();
     }
@@ -33,27 +34,43 @@ class FetchPaymentEmailsCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('since', InputArgument::REQUIRED, 'Date since when to fetch emails (YYYY-MM-DD)')
+            ->addOption('since', null, InputOption::VALUE_OPTIONAL, 'Date since when to fetch emails (YYYY-MM-DD or relative like "30d", "7d", "1w")', '7d')
             ->addOption('source', 's', InputOption::VALUE_OPTIONAL, 'Payment source to fetch (paypal, all)', 'all')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show what would be imported without actually importing')
             ->addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'Maximum number of emails to process', 100)
             ->addOption('test-connection', null, InputOption::VALUE_NONE, 'Test email server connection and exit')
             ->addOption('debug', 'd', InputOption::VALUE_NONE, 'Show debug information including email content')
             ->addOption('mock', null, InputOption::VALUE_NONE, 'Use mock email data instead of connecting to email server')
+            ->addOption('silent', null, InputOption::VALUE_NONE, 'Silent mode - no output except errors')
             ->setHelp('This command fetches payment emails since a specific date and processes them into incoming payments.
 
 Examples:
-  # Fetch all payment emails since 2025-08-27
-  php bin/console app:fetch-payment-emails 2025-08-27
+  # Fetch all payment emails from the last 7 days (default)
+  php bin/console app:fetch-payment-emails
 
-  # Fetch only PayPal emails with dry run
-  php bin/console app:fetch-payment-emails 2025-08-27 --source=paypal --dry-run
+  # Fetch emails from the last 30 days
+  php bin/console app:fetch-payment-emails --since=30d
+
+  # Fetch emails from the last 2 weeks
+  php bin/console app:fetch-payment-emails --since=2w
+
+  # Fetch emails since a specific date
+  php bin/console app:fetch-payment-emails --since=2025-08-27
+
+  # Fetch only PayPal emails with dry run from last 14 days
+  php bin/console app:fetch-payment-emails --since=14d --source=paypal --dry-run
 
   # Use mock data for testing with debug output
-  php bin/console app:fetch-payment-emails 2025-08-27 --source=paypal --dry-run --debug --mock
+  php bin/console app:fetch-payment-emails --since=30d --source=paypal --dry-run --debug --mock
 
-  # Test email connection
-  php bin/console app:fetch-payment-emails 2025-08-27 --test-connection');
+  # Silent mode for cron jobs
+  php bin/console app:fetch-payment-emails --since=1d --silent
+
+Supported relative date formats:
+  - Xd = X days ago (e.g., 30d = 30 days ago)
+  - Xw = X weeks ago (e.g., 2w = 2 weeks ago)
+  - Xm = X months ago (e.g., 1m = 1 month ago)
+  - YYYY-MM-DD = specific date');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -65,17 +82,27 @@ Examples:
             return $this->testEmailConnection($io);
         }
 
-        $sinceDate = $input->getArgument('since');
+        $sinceInput = $input->getOption('since');
         $source = $input->getOption('source');
         $dryRun = $input->getOption('dry-run');
         $debug = $input->getOption('debug');
         $mock = $input->getOption('mock');
+        $silent = $input->getOption('silent');
         $limit = (int) $input->getOption('limit');
 
-        // Validate date format
-        $date = DateTime::createFromFormat('Y-m-d', $sinceDate);
-        if (!$date || $date->format('Y-m-d') !== $sinceDate) {
-            $io->error('Invalid date format. Please use YYYY-MM-DD format.');
+        // Parse the since parameter (could be date or relative)
+        try {
+            $date = $this->parseSinceParameter($sinceInput);
+            $sinceDate = $date->format('Y-m-d');
+        } catch (\Exception $e) {
+            $io->error('Invalid date format: ' . $e->getMessage());
+            $io->note([
+                'Supported formats:',
+                '- Specific date: YYYY-MM-DD (e.g., 2025-08-27)',
+                '- Days ago: Xd (e.g., 30d for 30 days ago)',
+                '- Weeks ago: Xw (e.g., 2w for 2 weeks ago)', 
+                '- Months ago: Xm (e.g., 1m for 1 month ago)'
+            ]);
             return Command::FAILURE;
         }
 
@@ -86,21 +113,23 @@ Examples:
         //     $date = $maxTestDate;
         // }
 
-        $io->title('Fetching Payment Emails');
-        $io->info(sprintf('Fetching emails since: %s', $sinceDate));
-        $io->info(sprintf('Source: %s', $source));
-        $io->info(sprintf('Limit: %d emails', $limit));
-        
-        if ($dryRun) {
-            $io->warning('DRY RUN MODE - No payments will be actually imported');
-        }
+        if (!$silent) {
+            $io->title('Fetching Payment Emails');
+            $io->info(sprintf('Fetching emails since: %s (parsed from: %s)', $sinceDate, $sinceInput));
+            $io->info(sprintf('Source: %s', $source));
+            $io->info(sprintf('Limit: %d emails', $limit));
+            
+            if ($dryRun) {
+                $io->warning('DRY RUN MODE - No payments will be actually imported');
+            }
 
-        if ($mock) {
-            $io->info('MOCK MODE ENABLED - Using mock email data instead of connecting to email server');
-        }
+            if ($mock) {
+                $io->info('MOCK MODE ENABLED - Using mock email data instead of connecting to email server');
+            }
 
-        if ($debug) {
-            $io->info('DEBUG MODE ENABLED - Additional debug information will be shown');
+            if ($debug) {
+                $io->info('DEBUG MODE ENABLED - Additional debug information will be shown');
+            }
         }
 
         $processedCount = 0;
@@ -109,8 +138,10 @@ Examples:
 
         try {
             if ($source === 'paypal' || $source === 'all') {
-                $io->section('Processing PayPal Emails');
-                $result = $this->processPayPalEmails($date, $limit, $dryRun, $debug, $mock, $io);
+                if (!$silent) {
+                    $io->section('Processing PayPal Emails');
+                }
+                $result = $this->processPayPalEmails($date, $limit, $dryRun, $debug, $mock, $silent, $io);
                 $processedCount += $result['processed'];
                 $errorCount += $result['errors'];
                 $skippedCount += $result['skipped'];
@@ -120,23 +151,25 @@ Examples:
             return Command::FAILURE;
         }
 
-        $io->success('Email processing completed!');
-        $io->table(['Metric', 'Count'], [
-            ['Processed', $processedCount],
-            ['Skipped', $skippedCount],
-            ['Errors', $errorCount],
-        ]);
-
-        if ($processedCount > 0 && !$dryRun) {
-            $io->note([
-                'New payments have been added. You can now run automatic matching and processing:',
-                '',
-                '# Match payments to users and process them (tickets first, then catering):',
-                'php bin/console app:process-payments',
-                '',
-                '# Or run with dry-run to see what would happen:',
-                'php bin/console app:process-payments --dry-run --debug'
+        if (!$silent) {
+            $io->success('Email processing completed!');
+            $io->table(['Metric', 'Count'], [
+                ['Processed', $processedCount],
+                ['Skipped', $skippedCount],
+                ['Errors', $errorCount],
             ]);
+
+            if ($processedCount > 0 && !$dryRun) {
+                $io->note([
+                    'New payments have been added. You can now run automatic matching and processing:',
+                    '',
+                    '# Match payments to users and process them (tickets first, then catering):',
+                    'php bin/console app:process-payments',
+                    '',
+                    '# Or run with dry-run to see what would happen:',
+                    'php bin/console app:process-payments --dry-run --debug'
+                ]);
+            }
         }
 
         return Command::SUCCESS;
@@ -198,7 +231,7 @@ Examples:
         }
     }
 
-    private function processPayPalEmails(DateTime $since, int $limit, bool $dryRun, bool $debug, bool $mock, SymfonyStyle $io): array
+    private function processPayPalEmails(DateTime $since, int $limit, bool $dryRun, bool $debug, bool $mock, bool $silent, SymfonyStyle $io): array
     {
         $processed = 0;
         $errors = 0;
@@ -214,15 +247,19 @@ Examples:
                     // Create mock file if it doesn't exist
                     $mockEmails = $this->emailFetcherService->fetchEmailsSince($since, 10000, 'service@paypal.at', false);
                     file_put_contents($mockFilePath, json_encode($mockEmails, JSON_PRETTY_PRINT));
-                    $io->info('Created mock email file: ' . $mockFilePath);
+                    if (!$silent) {
+                        $io->info('Created mock email file: ' . $mockFilePath);
+                    }
                 }
                 
                 $emails = json_decode(file_get_contents($mockFilePath), true);
-                $io->info('Using mock email data from: ' . $mockFilePath);
+                if (!$silent) {
+                    $io->info('Using mock email data from: ' . $mockFilePath);
+                }
             } else {
                 // Fetch real emails from the server for the specified date range
                 $emails = $this->emailFetcherService->fetchEmailsSince($since, 10000, 'service@paypal.at', false);
-                if ($debug) {
+                if ($debug && !$silent) {
                     $io->info(sprintf('Fetched %d total emails from server since %s', count($emails), $since->format('Y-m-d')));
                 }
             }
@@ -237,14 +274,21 @@ Examples:
             $paypalPaymentEmails = array_slice($paypalPaymentEmails, 0, $limit);
             
             if (empty($paypalPaymentEmails)) {
-                $io->info(sprintf('No PayPal payment emails found since %s with subject "Sie haben eine Zahlung erhalten".', $since->format('Y-m-d')));
+                if (!$silent) {
+                    $io->info(sprintf('No PayPal payment emails found since %s with subject "Sie haben eine Zahlung erhalten".', $since->format('Y-m-d')));
+                }
                 return ['processed' => 0, 'errors' => 0, 'skipped' => 0];
             }
 
-            $io->info(sprintf('Found %d PayPal payment emails to process (limited to %d)', count($paypalPaymentEmails), $limit));
+            if (!$silent) {
+                $io->info(sprintf('Found %d PayPal payment emails to process (limited to %d)', count($paypalPaymentEmails), $limit));
+            }
 
-            $progressBar = $io->createProgressBar(count($paypalPaymentEmails));
-            $progressBar->start();
+            $progressBar = null;
+            if (!$silent) {
+                $progressBar = $io->createProgressBar(count($paypalPaymentEmails));
+                $progressBar->start();
+            }
 
             foreach ($paypalPaymentEmails as $email) {
                 try {
@@ -256,35 +300,36 @@ Examples:
                         try {
                             $paymentData = $this->paypalEmailProcessor->extractPaymentDataForDryRun($email);
                             if ($paymentData) {
-                                $io->section(sprintf('PayPal email from: %s', $email['date']));
-                                $io->text(sprintf('<info>Subject:</info> %s', $email['subject']));
-                                $io->text(sprintf('<info>Transaction ID:</info> %s', $paymentData['transaction_id'] ?? '<not found>'));
-                                
-                                // Display sender info with fallbacks
-                                if (isset($paymentData['payer_name'])) {
-                                    $io->text(sprintf('<info>Sender:</info> %s', $paymentData['payer_name']));
-                                } else {
-                                    // Try to extract sender from email data if available
-                                    $senderName = '';
-                                    if (isset($email['from']) && preg_match('/"?([^<"]+)"?\s+</', $email['from'], $matches)) {
-                                        $senderName = trim($matches[1]);
+                                if (!$silent) {
+                                    $io->section(sprintf('PayPal email from: %s', $email['date']));
+                                    $io->text(sprintf('<info>Subject:</info> %s', $email['subject']));
+                                    $io->text(sprintf('<info>Transaction ID:</info> %s', $paymentData['transaction_id'] ?? '<not found>'));
+                                    
+                                    // Display sender info with fallbacks
+                                    if (isset($paymentData['payer_name'])) {
+                                        $io->text(sprintf('<info>Sender:</info> %s', $paymentData['payer_name']));
+                                    } else {
+                                        // Try to extract sender from email data if available
+                                        $senderName = '';
+                                        if (isset($email['from']) && preg_match('/"?([^<"]+)"?\s+</', $email['from'], $matches)) {
+                                            $senderName = trim($matches[1]);
+                                        }
+                                        $io->text(sprintf('<info>Sender:</info> %s', $senderName ?: '<not found>'));
                                     }
-                                    $io->text(sprintf('<info>Sender:</info> %s', $senderName ?: '<not found>'));
-                                }
-                                
-                                // Display email with fallbacks
-                                if (isset($paymentData['payer_email'])) {
-                                    $io->text(sprintf('<info>Email:</info> %s', $paymentData['payer_email']));
-                                } elseif (isset($email['from']) && preg_match('/<([^>]+)>/', $email['from'], $matches)) {
-                                    $io->text(sprintf('<info>Email:</info> %s', $matches[1]));
-                                } else {
-                                    $io->text('<info>Email:</info> <not found>');
-                                }
-                                
-                                // Show amount with currency
-                                $io->text(sprintf('<info>Amount:</info> %.2f %s', 
-                                    $paymentData['amount'] ?? 0, 
-                                    $paymentData['currency'] ?? 'EUR'
+                                    
+                                    // Display email with fallbacks
+                                    if (isset($paymentData['payer_email'])) {
+                                        $io->text(sprintf('<info>Email:</info> %s', $paymentData['payer_email']));
+                                    } elseif (isset($email['from']) && preg_match('/<([^>]+)>/', $email['from'], $matches)) {
+                                        $io->text(sprintf('<info>Email:</info> %s', $matches[1]));
+                                    } else {
+                                        $io->text('<info>Email:</info> <not found>');
+                                    }
+                                    
+                                    // Show amount with currency
+                                    $io->text(sprintf('<info>Amount:</info> %.2f %s', 
+                                        $paymentData['amount'] ?? 0, 
+                                        $paymentData['currency'] ?? 'EUR'
                                 ));
                                 
                                 // Show reference/message with proper context
@@ -307,22 +352,36 @@ Examples:
                                 }
                                 
                                 $io->newLine();
+                                }
+                                
+                                // Log to file in both dry-run and normal mode
+                                $this->logToFile(
+                                    $paymentData['payer_name'] ?? 'unknown',
+                                    $paymentData['amount'] ?? 0,
+                                    'dry-run',
+                                    $paymentData['reference'] ?? $paymentData['description'] ?? ''
+                                );
+                                
                                 $processed++;
                             } else {
-                                $io->warning(sprintf('Would skip PayPal email: %s (could not extract payment data)', $email['subject']));
+                                if (!$silent) {
+                                    $io->warning(sprintf('Would skip PayPal email: %s (could not extract payment data)', $email['subject']));
+                                    if ($debug) {
+                                        $io->text('<info>Debug - Email content:</info>');
+                                        $plainTextContent = $this->cleanEmailContent($email['content']);
+                                        $io->text('  ' . str_replace("\n", "\n  ", substr($plainTextContent, 0, 500)) . '...');
+                                    }
+                                }
+                                $skipped++;
+                            }
+                        } catch (\Exception $e) {
+                            if (!$silent) {
+                                $io->error(sprintf('Error processing PayPal email: %s (%s)', $email['subject'], $e->getMessage()));
                                 if ($debug) {
                                     $io->text('<info>Debug - Email content:</info>');
                                     $plainTextContent = $this->cleanEmailContent($email['content']);
                                     $io->text('  ' . str_replace("\n", "\n  ", substr($plainTextContent, 0, 500)) . '...');
                                 }
-                                $skipped++;
-                            }
-                        } catch (\Exception $e) {
-                            $io->error(sprintf('Error processing PayPal email: %s (%s)', $email['subject'], $e->getMessage()));
-                            if ($debug) {
-                                $io->text('<info>Debug - Email content:</info>');
-                                $plainTextContent = $this->cleanEmailContent($email['content']);
-                                $io->text('  ' . str_replace("\n", "\n  ", substr($plainTextContent, 0, 500)) . '...');
                             }
                             $skipped++;
                         }
@@ -331,40 +390,71 @@ Examples:
                         if ($payment) {
                             $payerName = $payment->getPayerName() ?: 'unknown';
                             
-                            $io->text(sprintf('Created payment: %s EUR from %s', 
-                                $payment->getAmount(), 
-                                $payerName
-                            ));
+                            if (!$silent) {
+                                $io->text(sprintf('Created payment: %s EUR from %s', 
+                                    $payment->getAmount(), 
+                                    $payerName
+                                ));
+                            }
+                            
+                            // Log to file
+                            $this->logToFile(
+                                $payerName,
+                                $payment->getAmount(),
+                                'created',
+                                $payment->getDescription() ?? ''
+                            );
+                            
                             $processed++;
                         } else {
                             // Check if this was skipped due to duplicate
                             $paymentData = $this->paypalEmailProcessor->extractPaymentDataForDryRun($email);
                             if ($paymentData && isset($paymentData['transaction_id']) && !empty($paymentData['transaction_id'])) {
-                                $io->text(sprintf('<comment>Skipped duplicate: %s EUR from %s (Transaction ID: %s)</comment>', 
-                                    $paymentData['amount'] ?? 'unknown', 
-                                    $paymentData['payer_name'] ?? 'unknown',
-                                    $paymentData['transaction_id']
-                                ));
+                                if (!$silent) {
+                                    $io->text(sprintf('<comment>Skipped duplicate: %s EUR from %s (Transaction ID: %s)</comment>', 
+                                        $paymentData['amount'] ?? 'unknown', 
+                                        $paymentData['payer_name'] ?? 'unknown',
+                                        $paymentData['transaction_id']
+                                    ));
+                                }
                             } else {
-                                $io->text(sprintf('<comment>Skipped: %s (could not parse or missing transaction ID)</comment>', $email['subject']));
+                                if (!$silent) {
+                                    $io->text(sprintf('<comment>Skipped: %s (could not parse or missing transaction ID)</comment>', $email['subject']));
+                                }
+                                
+                                // Log to file
+                                $this->logToFile(
+                                    'unknown',
+                                    0,
+                                    'skipped',
+                                    $email['subject'] ?? 'unknown subject'
+                                );
                             }
                             $skipped++;
                         }
                     }
 
                 } catch (\Exception $e) {
-                    $io->error(sprintf('Error processing email "%s": %s', $email['subject'] ?? 'unknown', $e->getMessage()));
+                    if (!$silent) {
+                        $io->error(sprintf('Error processing email "%s": %s', $email['subject'] ?? 'unknown', $e->getMessage()));
+                    }
                     $errors++;
                 }
 
-                $progressBar->advance();
+                if ($progressBar) {
+                    $progressBar->advance();
+                }
             }
 
-            $progressBar->finish();
-            $io->newLine(2);
+            if ($progressBar) {
+                $progressBar->finish();
+                $io->newLine(2);
+            }
 
         } catch (\Exception $e) {
-            $io->error('Error fetching PayPal emails: ' . $e->getMessage());
+            if (!$silent) {
+                $io->error('Error fetching PayPal emails: ' . $e->getMessage());
+            }
             $errors++;
         }
 
@@ -398,5 +488,66 @@ Examples:
         $content = trim($content);
         
         return $content;
+    }
+
+    /**
+     * Parse the since parameter which can be a date (YYYY-MM-DD) or relative (30d, 2w, 1m)
+     */
+    private function parseSinceParameter(string $since): DateTime
+    {
+        // Try to parse as absolute date first
+        $date = DateTime::createFromFormat('Y-m-d', $since);
+        if ($date && $date->format('Y-m-d') === $since) {
+            return $date;
+        }
+
+        // Parse relative date formats
+        if (preg_match('/^(\d+)([dwm])$/', $since, $matches)) {
+            $amount = (int) $matches[1];
+            $unit = $matches[2];
+            
+            $date = new DateTime();
+            
+            switch ($unit) {
+                case 'd': // days
+                    $date->modify("-{$amount} days");
+                    break;
+                case 'w': // weeks
+                    $date->modify("-{$amount} weeks");
+                    break;
+                case 'm': // months
+                    $date->modify("-{$amount} months");
+                    break;
+            }
+            
+            return $date;
+        }
+
+        throw new \InvalidArgumentException(sprintf(
+            'Invalid since parameter "%s". Use YYYY-MM-DD format or relative format like "30d", "2w", "1m".',
+            $since
+        ));
+    }
+
+    private function logToFile(string $name, float $amount, string $status, string $description = ''): void
+    {
+        $logFile = $this->projectDir . '/var/log/cron-paypal.log';
+        $logDir = dirname($logFile);
+        
+        // Create log directory if it doesn't exist
+        if (!is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+        
+        $timestamp = date('Y-m-d H:i:s');
+        $logLine = sprintf("%s;%s;%.2f;%s;%s\n", 
+            $timestamp, 
+            $name, 
+            $amount, 
+            $status, 
+            str_replace([';', "\n", "\r"], [':', ' ', ' '], $description)
+        );
+        
+        file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX);
     }
 }

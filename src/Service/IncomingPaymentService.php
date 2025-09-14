@@ -304,10 +304,6 @@ class IncomingPaymentService
             $parts[] = 'from ' . $payment->getPayerEmail();
         }
 
-        if ($payment->getReference()) {
-            $parts[] = 'ref: ' . substr($payment->getReference(), 0, 50);
-        }
-
         return implode(' ', $parts);
     }
 

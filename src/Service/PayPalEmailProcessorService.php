@@ -214,42 +214,8 @@ class PayPalEmailProcessorService
             $result['date'] = null; // No date found
         }
 
-        // Extract payer email - be careful to distinguish between different email types
-        if (!isset($result['payer_email'])) {
-            // For incoming payments ("hat Ihnen ... gesendet"), there's usually no payer email in the content
-            // PayPal doesn't include sender's personal email for privacy reasons
-            if (isset($result['payer_name']) && preg_match('/hat\s+Ihnen.*gesendet/i', $plainTextContent)) {
-                // This is an incoming payment - no real payer email available
-                $result['payer_email'] = 'incoming-payment@unknown.paypal';
-            }
-            // For outgoing payments, look for merchant emails like "paypal-charges@..."
-            elseif (preg_match('/paypal-charges@[a-zA-Z0-9.-]+/i', $plainTextContent, $matches)) {
-                $result['payer_email'] = $matches[0];
-            }
-            // Try to extract from HTML links (but avoid service emails)
-            elseif (preg_match('/<a[^>]*>([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})<\/a>/i', $content, $emailMatches)) {
-                $email = $emailMatches[1];
-                // Skip obvious service emails
-                if (!preg_match('/service@paypal\.|noreply@|no-reply@/i', $email)) {
-                    $result['payer_email'] = $email;
-                }
-            }
-            // Look for email patterns in plain text (but avoid service emails)
-            elseif (preg_match('/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i', $plainTextContent, $emailMatches)) {
-                $email = $emailMatches[1];
-                // Skip obvious service emails
-                if (!preg_match('/service@paypal\.|noreply@|no-reply@/i', $email)) {
-                    $result['payer_email'] = $email;
-                } else {
-                    $result['payer_email'] = 'service-email@unknown.paypal';
-                }
-            }
-            // Default fallback
-            else {
-                $result['payer_email'] = 'unknown@paypal.com';
-            }
-        }
-
+        $result['payer_email'] = '';
+        
         // Validate required fields for a payment email
         if (!isset($result['amount']) || (float)$result['amount'] <= 0) {
             return null; // No valid amount found, probably not a payment email
