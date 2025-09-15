@@ -3,6 +3,8 @@
 namespace App\DataFixtures;
 
 use App\Entity\Seat;
+use App\Entity\SeatKind;
+use App\Entity\SeatOrientation;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Bundle\FixturesBundle\FixtureGroupInterface;
 use Doctrine\Persistence\ObjectManager;
@@ -14,40 +16,32 @@ class SeatmapGeneratorFixture extends Fixture implements FixtureGroupInterface
     // 
     // php bin/console doctrine:fixtures:load --group=seatmap --append
     // 
-    // seats table will be truncated and filled with new data, but you
-    // can disable the line `$this->resetSeatTable($manager);` below
+    const TRUNCATE_TABLE = true; // true = delete all seats before generating new ones
 
     // -------- Settings -------- //
-    // 6 Tische 3 Sektoren
+    // 8 Tische zusammenhängend pro Reihe
     const ALIGNMENT = 'horizontal';
-    const SEATS_PER_ROW = 6;
-    const NUMBER_OF_SECTORS = 3;
-    const ROW_START_TOP = 90;
-    const ROW_START_LEFT = 330;
+    const SEATS_PER_ROW = 8;
+    const NUMBER_OF_SECTORS = 1;
+    const START_SECTOR = 5;
+
+    const ROW_START_TOP = 90; // 90 start + 100 per sector
+    const ROW_START_LEFT = 315;
     const SECTOR_DISTANCE = 40;
-
-    // 8 Tische 2 Sektoren
-    // const ALIGNMENT = 'horizontal';
-    // const SEATS_PER_ROW = 8;
-    // const NUMBER_OF_SECTORS = 2;
-    // const ROW_START_TOP = 100;
-    // const ROW_START_LEFT = 280;
-    // const SECTOR_DISTANCE = 60;
-
     const SEAT_WIDTH_MULTIPLIER = 2; // same as in settings
     const SEAT_WIDTH = 25; // same as in settings
-    const TABLE_DISTANCE_RHYTHM = [5, self::SEAT_WIDTH]; // disance between tables next to each other
+    const TABLE_DISTANCE_RHYTHM = [5]; // [5, self::SEAT_WIDTH]; // distance between tables next to each other (2 + 2 + 2 + 2 tables per row)
     const OPPOSITE_TABLE_DISTANCE = 5;
     
     
     // -------- Seatmap Generator -------- //
-    const TYPE = 'seat';
+    const TYPE = SeatKind::SEAT;
     const FIXTURE_GROUPS = ['seatmap'];
-    private $currentSector = 1;
+    private $currentSector = self::START_SECTOR;
     private $currentSeatNumber = 1;
     private $seatAligments = [
-        'horizontal' => 'top-bottom',
-        'vertical' => 'left-right',
+        'horizontal' => SeatOrientation::NORTH, // 'top-bottom',
+        'vertical' => SeatOrientation::EAST, // 'left-right',
     ];
 
     public function resetSeatTable($manager)
@@ -56,7 +50,9 @@ class SeatmapGeneratorFixture extends Fixture implements FixtureGroupInterface
         $platform = $connection->getDatabasePlatform();
 
         // This will truncate the 'seat' table, resetting indexes and IDs
-        $connection->executeUpdate($platform->getTruncateTableSQL('seat', true));
+        if (self::TRUNCATE_TABLE) {
+          $connection->executeUpdate($platform->getTruncateTableSQL('seat', true));
+        }
     }
 
     public function generateSeatMapHorizontal()
@@ -65,19 +61,23 @@ class SeatmapGeneratorFixture extends Fixture implements FixtureGroupInterface
         $posY = self::ROW_START_TOP;
         $posX = self::ROW_START_LEFT;
 
-        for ($sector = 1; $sector <= self::NUMBER_OF_SECTORS; $sector++) {
+        for ($i = 1; $i <= self::NUMBER_OF_SECTORS; $i++) {
             for ($row = 1; $row <= 2; $row++) {
                 $posX = self::ROW_START_LEFT;
                 $rythmIndex = 0;
 
                 for ($rowSeat = 1; $rowSeat <= self::SEATS_PER_ROW; $rowSeat++) {
                     $seatNumber = $this->currentSeatNumber++;
-                    $chairPositions = explode('-', $this->seatAligments[self::ALIGNMENT]);
+                    if (self::ALIGNMENT === 'horizontal') {
+                      $chairPositions = [SeatOrientation::NORTH, SeatOrientation::SOUTH];
+                    } else {
+                      $chairPositions = [SearOrientation::EAST, SeatOrientation::WEST];
+                    }
 
                     $seats[] = [
                         'pos_x' => $posX,
                         'pos_y' => $posY,
-                        'sector' => $sector,
+                        'sector' => $this->currentSector,
                         'seat_number' => $seatNumber,
                         'type' => self::TYPE,
                         'chair_position' => $row % 2 === 0 ? $chairPositions[1] : $chairPositions[0],
@@ -93,6 +93,7 @@ class SeatmapGeneratorFixture extends Fixture implements FixtureGroupInterface
             }
 
             $posY += self::SECTOR_DISTANCE;
+            $this->currentSector++;
         }
 
         return $seats;
@@ -124,7 +125,6 @@ class SeatmapGeneratorFixture extends Fixture implements FixtureGroupInterface
     {
         $this->resetSeatTable($manager);
 
-        $this->currentSector = 1;
         $this->seatNumberStartOdd = 1;
         $this->seatNumberStartEven = 2;
 

@@ -68,7 +68,7 @@
                             {% else %}
                                 {% set ownSeat = user is not empty and seat.owner is not empty and seat.owner == user.uuid %}
                                 {% set ownClan = user is not empty and (
-                                        (seat.owner is not empty and seat.owner is in_clans(user.clans.toArray)) or
+                                        (seat.owner is not empty and user.clans is not empty and seat.owner is in_clans(user.clans.toArray)) or
                                         (seat.clanReservation is not empty and user is in_clan(seat.clanReservation))
                                 ) %}
                                 {% set taken = seat.owner is not empty %}

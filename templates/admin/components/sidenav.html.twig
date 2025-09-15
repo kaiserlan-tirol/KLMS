@@ -4,7 +4,7 @@
     </li>
     {% if is_granted('ROLE_ADMIN_NEWS') or is_granted('ROLE_ADMIN_CONTENT') or is_granted('ROLE_ADMIN_MEDIA') %}
         <li class="nav-item">
-            <a class="nav-link" href="#contentMenu" data-toggle="collapse"><i class="far fa-file-alt fa-fw"></i> Inhalt</a>
+            <a class="nav-link" href="#contentMenu" data-toggle="collapse" aria-expanded="true" aria-controls="contentMenu"><i class="far fa-file-alt fa-fw"></i> Inhalt</a>
             <ul id="contentMenu" class="collapse show list-group">
                 {% if is_granted('ROLE_ADMIN_NEWS') %}
                     <li class="nav-item">
@@ -40,7 +40,7 @@
     {% endif %}
     {% if is_granted('ROLE_ADMIN_USER') %}
         <li class="nav-item">
-            <a class="nav-link" href="#communityMenu" data-toggle="collapse"><i class="fas fa-user-friends fa-fw"></i> Community</a>
+            <a class="nav-link" href="#communityMenu" data-toggle="collapse" aria-expanded="true" aria-controls="communityMenu"><i class="fas fa-user-friends fa-fw"></i> Community</a>
             <ul id="communityMenu" class="collapse show list-group">
                 <li class="nav-item">
                     <a class="nav-link {% if app.request.get('_route') starts with 'admin_user' %}active{% endif %}" href="{{ path('admin_user') }}"><i class="fas fa-user fa-fw"></i> User </a>
@@ -54,7 +54,7 @@
 
     {% if is_granted('ROLE_ADMIN_PAYMENT') %}
         <li class="nav-item">
-            <a class="nav-link" href="#cateringMenu" data-toggle="collapse"><i class="fas fa-utensils fa-fw"></i> Catering</a>
+            <a class="nav-link" href="#cateringMenu" data-toggle="collapse" aria-expanded="true" aria-controls="cateringMenu"><i class="fas fa-utensils fa-fw"></i> Catering</a>
             <ul id="cateringMenu" class="collapse show list-group">
                 <li class="nav-item">
                     <a class="nav-link {% if app.request.get('_route') == 'admin_catering' %}active{% endif %}" href="{{ path('admin_catering') }}"><i class="fas fa-list fa-fw"></i> Bestellungen </a>
@@ -79,7 +79,7 @@
     {% endif %}
     {% if is_granted('ROLE_ADMIN_PAYMENT') or is_granted('ROLE_ADMIN_SEATMAP') or is_granted('ROLE_ADMIN_TOURNEY') %}
         <li class="nav-item">
-            <a class="nav-link" href="#lanMenu" data-toggle="collapse"><i class="fas fa-laptop-house fa-fw"></i> LAN</a>
+            <a class="nav-link" href="#lanMenu" data-toggle="collapse" aria-expanded="true" aria-controls="lanMenu"><i class="fas fa-laptop-house fa-fw"></i> LAN</a>
             <ul id="lanMenu" class="collapse show list-group">
                 {% if is_granted('ROLE_ADMIN_PAYMENT') %}
                 <li class="nav-item">

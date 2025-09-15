@@ -9,6 +9,11 @@
   }
 }
 
+.seatmap-bg {
+  width: 850px;
+  margin-left: 50px;
+}
+
 .seat-border {}
 @mixin seat-border($color) {
   @extend .seat-border;
