@@ -3,9 +3,11 @@
 namespace App\Service;
 
 use App\Entity\IncomingPayment;
+use App\Entity\ShopOrderStatus;
 use App\Entity\User;
 use App\Idm\IdmManager;
 use App\Idm\IdmRepository;
+use App\Repository\ShopOrderRepository;
 use Psr\Log\LoggerInterface;
 
 class PaymentProcessingService
@@ -13,17 +15,23 @@ class PaymentProcessingService
     private readonly CateringService $cateringService;
     private readonly ShopService $shopService;
     private readonly IdmRepository $userRepo;
+    private readonly ShopOrderRepository $shopOrderRepository;
     private readonly LoggerInterface $logger;
+    private readonly TransactionService $transactionService;
 
     public function __construct(
         CateringService $cateringService,
         ShopService $shopService,
         IdmManager $idmManager,
+        ShopOrderRepository $shopOrderRepository,
+        TransactionService $transactionService,
         LoggerInterface $logger
     ) {
         $this->cateringService = $cateringService;
         $this->shopService = $shopService;
         $this->userRepo = $idmManager->getRepository(User::class);
+        $this->shopOrderRepository = $shopOrderRepository;
+        $this->transactionService = $transactionService;
         $this->logger = $logger;
     }
 
@@ -36,6 +44,30 @@ class PaymentProcessingService
         $user = $this->userRepo->findOneById($payment->getMatchedUser());
         if (!$user) {
             throw new \InvalidArgumentException('Matched user not found');
+        }
+
+        // Check if this payment might be a duplicate of a recently paid order
+        if ($this->transactionService->isDuplicatePayment($user->getUuid(), $payment->getAmountInCents())) {
+            $payment->setStatus(IncomingPayment::STATUS_PROCESSED);
+            $payment->setProcessingNotes('Payment skipped - duplicate of recently paid order (already_assigned)');
+            
+            $this->logger->info('Payment skipped as duplicate', [
+                'payment_id' => $payment->getId(),
+                'user_id' => $user->getUuid()->toString(),
+                'amount' => $payment->getAmountInCents(),
+                'reason' => 'already_assigned'
+            ]);
+            
+            return [
+                'shop_orders_processed' => 0,
+                'shop_amount_used' => 0,
+                'catering_orders_processed' => 0,
+                'catering_amount_used' => 0,
+                'credit_added' => 0,
+                'total_amount' => $payment->getAmountInCents(),
+                'processing_notes' => ['Payment skipped - already assigned to recent order'],
+                'skipped_as_duplicate' => true
+            ];
         }
 
         $amountInCents = $payment->getAmountInCents();
@@ -194,4 +226,5 @@ class PaymentProcessingService
             'total_open_amount' => $shopTotal + $cateringTotal
         ];
     }
+
 }

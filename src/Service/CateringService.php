@@ -11,8 +11,6 @@ use App\Entity\CateringOrderStatus;
 use App\Entity\CateringProduct;
 use App\Entity\User;
 use App\Entity\UserCateringCredit;
-use App\Repository\CateringCreditTransactionRepository;
-use App\Repository\UserCateringCreditRepository;
 use App\Exception\OrderLifecycleException;
 use App\Helper\EmailRecipient;
 use App\Idm\IdmManager;
@@ -35,8 +33,7 @@ class CateringService
     private readonly IdmRepository $userRepo;
     private readonly EmailService $emailService;
     private readonly ShopService $shopService;
-    private readonly UserCateringCreditRepository $creditRepository;
-    private readonly CateringCreditTransactionRepository $transactionRepository;
+    private readonly TransactionService $transactionService;
 
     public function __construct(
         CateringOrderRepository $orderRepository,
@@ -45,8 +42,7 @@ class CateringService
         IdmManager $idmManager,
         EmailService $emailService,
         ShopService $shopService,
-        UserCateringCreditRepository $creditRepository,
-        CateringCreditTransactionRepository $transactionRepository,
+        TransactionService $transactionService,
         EntityManagerInterface $em,
         LoggerInterface $logger
     ) {
@@ -56,8 +52,7 @@ class CateringService
         $this->userRepo = $idmManager->getRepository(User::class);
         $this->emailService = $emailService;
         $this->shopService = $shopService;
-        $this->creditRepository = $creditRepository;
-        $this->transactionRepository = $transactionRepository;
+        $this->transactionService = $transactionService;
         $this->em = $em;
         $this->logger = $logger;
     }
@@ -280,6 +275,7 @@ class CateringService
                 // Optional: Send notification to admin about payment sent
                 break;
             case CateringOrderStatus::Refunded:
+                $this->transactionService->processOrderRefund($order);
                 break;
             case CateringOrderStatus::Canceled:
                 break;
@@ -595,9 +591,9 @@ class CateringService
     public function getUserCredit(User|UuidInterface $user): int
     {
         $uuid = $user instanceof User ? $user->getUuid() : $user;
-        $credit = $this->creditRepository->findByUser($uuid);
+        $balance = $this->transactionService->getUserBalance($uuid);
         
-        return $credit ? $credit->getAmount() : 0;
+        return $balance->getCateringBalance();
     }
 
     /**
@@ -606,7 +602,7 @@ class CateringService
      * @param User|UuidInterface $user The user to add credit to
      * @param int $amount The amount to add in cents
      * @param string|null $note Optional note about the credit addition
-     * @return UserCateringCredit The updated credit entity
+     * @return UserCateringCredit The updated credit entity (for backwards compatibility)
      */
     public function addUserCredit(User|UuidInterface $user, int $amount, ?string $note = null): UserCateringCredit
     {
@@ -615,28 +611,19 @@ class CateringService
         }
         
         $uuid = $user instanceof User ? $user->getUuid() : $user;
-        $credit = $this->creditRepository->findByUser($uuid);
         
-        if (!$credit) {
-            $credit = new UserCateringCredit();
-            $credit->setUser($uuid);
-        }
+        // Use the new transaction service
+        $this->transactionService->addManualCredit($uuid, $amount, 'catering', $note ?? 'Guthaben aufgeladen');
         
-        $credit->addCredit($amount);
+        // For backwards compatibility, return a UserCateringCredit-like object
+        // This is a temporary solution until all callers are updated
+        $balance = $this->transactionService->getUserBalance($uuid);
+        $credit = new UserCateringCredit();
+        $credit->setUser($uuid);
+        $credit->setAmount($balance->getCateringBalance());
         if ($note) {
             $credit->setNote($note);
         }
-        
-        $this->creditRepository->save($credit);
-        
-        // Record transaction
-        $transaction = new CateringCreditTransaction();
-        $transaction->setUser($uuid);
-        $transaction->setAmount($amount);
-        $transaction->setType(CateringCreditTransaction::TYPE_PAYMENT_RECEIVED);
-        $transaction->setDescription($note ?? 'Guthaben aufgeladen');
-        
-        $this->transactionRepository->save($transaction);
         
         return $credit;
     }
@@ -657,33 +644,14 @@ class CateringService
         }
         
         $uuid = $user instanceof User ? $user->getUuid() : $user;
-        $credit = $this->creditRepository->findByUser($uuid);
-        
-        // Create credit entity if it doesn't exist yet
-        if (!$credit) {
-            $credit = new UserCateringCredit();
-            $credit->setUser($uuid);
-        }
-        
-        // Always allow deduction (potentially going into negative balance)
-        $credit->deductCredit($amount);
-        $this->creditRepository->save($credit);
-        
-        // Record transaction
-        $transaction = new CateringCreditTransaction();
-        $transaction->setUser($uuid);
-        $transaction->setAmount(-$amount);
         
         if ($order) {
-            $transaction->setType(CateringCreditTransaction::TYPE_ORDER_PAYMENT);
-            $transaction->setOrder($order);
-            $transaction->setDescription('Bezahlung für Bestellung #' . $order->getId());
+            // Use TransactionService for order payments
+            $this->transactionService->processOrderPayment($order);
         } else {
-            $transaction->setType(CateringCreditTransaction::TYPE_CREDIT_ADJUSTMENT);
-            $transaction->setDescription($note ?: 'Manuelle Guthabenanpassung');
+            // Manual deduction - use manual credit deduction
+            $this->transactionService->addManualCredit($uuid, -$amount, 'catering', $note ?: 'Manuelle Guthabenanpassung');
         }
-        
-        $this->transactionRepository->save($transaction);
         
         return true;
     }
@@ -697,7 +665,7 @@ class CateringService
     public function getUserTransactionHistory(User|UuidInterface $user): array
     {
         $uuid = $user instanceof User ? $user->getUuid() : $user;
-        return $this->transactionRepository->findByUser($uuid);
+        return $this->transactionService->getUserTransactionHistory($uuid);
     }
 
     /**
@@ -760,14 +728,8 @@ class CateringService
                 $amountUsed += $orderTotal;
                 $ordersProcessed++;
                 
-                // Record transaction for this order
-                $transaction = new CateringCreditTransaction();
-                $transaction->setUser($uuid);
-                $transaction->setAmount(-$orderTotal);
-                $transaction->setType(CateringCreditTransaction::TYPE_ORDER_PAYMENT);
-                $transaction->setOrder($order);
-                $transaction->setDescription('Bezahlung für Bestellung #' . $order->getId());
-                $this->transactionRepository->save($transaction);
+                // Record transaction for this order using TransactionService
+                $this->transactionService->processOrderPayment($order);
             } else {
                 // Not enough to cover this order - it remains in payment_sent status
                 break;
@@ -776,7 +738,7 @@ class CateringService
         
         // Add any remaining amount as credit
         if ($remainingAmount > 0) {
-            $this->addUserCredit($uuid, $remainingAmount, $note);
+            $this->transactionService->addManualCredit($uuid, $remainingAmount, 'catering', $note ?? 'Incoming payment processing');
             $amountToCredit = $remainingAmount;
         }
         

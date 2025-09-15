@@ -34,13 +34,14 @@ class ShopService
     private readonly TicketService $ticketService;
     private readonly EmailService $emailService;
     private readonly IdmRepository $userRepo;
+    private readonly TransactionService $transactionService;
 
     public const DEFAULT_TICKET_PRICE = 5000;
     public const MAX_TICKET_COUNT = 20;
     private LoggerInterface $logger;
 
     public function __construct(ShopOrderRepository $orderRepository, ShopOrderPositionRepository $shopOrderPositionRepository, ShopAddonsRepository $shopAddonsRepository,
-                                IdmManager          $idmManager, SettingService $settingService, TicketService $ticketService, EmailService $emailService, EntityManagerInterface $em, LoggerInterface $logger)
+                                IdmManager          $idmManager, SettingService $settingService, TicketService $ticketService, EmailService $emailService, EntityManagerInterface $em, LoggerInterface $logger, TransactionService $transactionService)
     {
         $this->orderRepository = $orderRepository;
         $this->shopOrderPositionRepository = $shopOrderPositionRepository;
@@ -51,6 +52,7 @@ class ShopService
         $this->emailService = $emailService;
         $this->em = $em;
         $this->logger = $logger;
+        $this->transactionService = $transactionService;
     }
 
     public function getAll()
@@ -170,6 +172,28 @@ class ShopService
         $result = $this->setState($order, ShopOrderStatus::Paid);
         if (!$result) {
             throw new OrderLifecycleException($order);
+        }
+
+        // Create a transaction record for the manual payment confirmation
+        try {
+            $this->transactionService->processShopOrderPayment(
+                $order->getOrderer(),
+                $order->calculateTotal(),
+                $order->getId(),
+                'Manual payment confirmation via admin interface'
+            );
+            
+            $this->logger->info('Created transaction record for manually confirmed shop order', [
+                'order_id' => $order->getId(),
+                'amount' => $order->calculateTotal(),
+                'user_id' => $order->getOrderer()->toString()
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->warning('Failed to create transaction record for manual payment', [
+                'order_id' => $order->getId(),
+                'error' => $e->getMessage()
+            ]);
+            // Don't throw - order state is already updated, this is just for tracking
         }
     }
 

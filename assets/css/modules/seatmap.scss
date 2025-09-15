@@ -9,11 +9,6 @@
   }
 }
 
-.seatmap-bg {
-  width: 850px;
-  margin-left: 50px;
-}
-
 .seat-border {}
 @mixin seat-border($color) {
   @extend .seat-border;
@@ -76,6 +71,9 @@ $seat-orientations: n, e, s, w;
 }
 
 .seatmap-legend {
+  .d-flex {
+    margin-top: 5px;
+  }
   .seat {
     height: 33px;
     width: 33px;

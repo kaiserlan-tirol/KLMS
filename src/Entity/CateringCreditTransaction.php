@@ -12,6 +12,7 @@ class CateringCreditTransaction
 {
     public const TYPE_PAYMENT_RECEIVED = 'payment_received';
     public const TYPE_ORDER_PAYMENT = 'order_payment';
+    public const TYPE_ORDER_REFUND = 'order_refund';
     public const TYPE_CREDIT_ADJUSTMENT = 'credit_adjustment';
 
     #[ORM\Id]

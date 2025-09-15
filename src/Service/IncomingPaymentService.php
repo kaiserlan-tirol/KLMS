@@ -327,8 +327,8 @@ class IncomingPaymentService
 
             // Step 2: If matched to user with high confidence, process the payment automatically
             if ($payment->getMatchConfidence() === IncomingPayment::CONFIDENCE_HIGH) {
-                // Process the payment through the payment processing service
-                $this->paymentProcessingService->processPayment($payment);
+                // Process the payment through the main processing method (sets status to processed)
+                $this->processPayment($payment);
                 
                 $this->logger->info('Payment automatically processed', [
                     'payment_id' => $payment->getId(),

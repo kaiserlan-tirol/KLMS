@@ -33,7 +33,6 @@ class StatisticService extends OptimalService
     public function get(string $key): string
     {
         return match ($key) {
-            'seats_max' => 60,
             'seats_free' => $this->countSeatsFree(),
             'seats_total' => $this->countSeatsTotal(),
             'seats_taken' => $this->countSeatsTaken(),

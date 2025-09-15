@@ -3,6 +3,7 @@
 namespace App\Controller\Admin;
 
 use App\Entity\IncomingPayment;
+use App\Repository\UserTransactionRepository;
 use App\Service\IncomingPaymentService;
 use App\Service\PaymentMatchingService;
 use App\Service\PaymentProcessingService;
@@ -12,6 +13,7 @@ use App\Service\TicketService;
 use Doctrine\ORM\EntityManagerInterface;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\Extension\Core\Type\MoneyType;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
@@ -22,6 +24,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Constraints\File;
 use Symfony\Component\Validator\Constraints\GreaterThan;
+use Symfony\Component\Validator\Constraints\NotBlank;
 
 #[IsGranted('ROLE_ADMIN_PAYMENT')]
 #[Route(path: '/incoming-payment', name: 'incoming_payment')]
@@ -33,6 +36,7 @@ class IncomingPaymentController extends AbstractController
     private readonly PayPalImportService $payPalImportService;
     private readonly UserService $userService;
     private readonly TicketService $ticketService;
+    private readonly UserTransactionRepository $userTransactionRepository;
     private readonly EntityManagerInterface $em;
 
     public function __construct(
@@ -42,6 +46,7 @@ class IncomingPaymentController extends AbstractController
         PayPalImportService $payPalImportService,
         UserService $userService,
         TicketService $ticketService,
+        UserTransactionRepository $userTransactionRepository,
         EntityManagerInterface $em
     ) {
         $this->incomingPaymentService = $incomingPaymentService;
@@ -50,6 +55,7 @@ class IncomingPaymentController extends AbstractController
         $this->payPalImportService = $payPalImportService;
         $this->userService = $userService;
         $this->ticketService = $ticketService;
+        $this->userTransactionRepository = $userTransactionRepository;
         $this->em = $em;
     }
 
@@ -208,6 +214,11 @@ class IncomingPaymentController extends AbstractController
                 $usersWithTickets[$user->getUuid()->toString()] = $hasTicket;
             }
         }
+        // Get related UserTransactions for this payment
+        $relatedTransactions = $this->userTransactionRepository->findBy([
+            'referenceType' => 'incoming_payment',
+            'referenceId' => (string) $payment->getId()
+        ], ['createdAt' => 'DESC']);
         
         return $this->render('admin/incoming_payment/show.html.twig', [
             'payment' => $payment,
@@ -215,6 +226,7 @@ class IncomingPaymentController extends AbstractController
             'suggestedMatches' => $suggestedMatches,
             'allUsers' => $allUsers,
             'usersWithTickets' => $usersWithTickets,
+            'relatedTransactions' => $relatedTransactions,
         ]);
     }
 
@@ -222,7 +234,7 @@ class IncomingPaymentController extends AbstractController
     public function process(IncomingPayment $payment): Response
     {
         try {
-            $this->paymentProcessingService->processPayment($payment);
+            $this->incomingPaymentService->processPayment($payment, $this->getUser()?->getUuid());
             $this->addFlash('success', 'Zahlung erfolgreich verarbeitet.');
         } catch (\Exception $e) {
             $this->addFlash('error', 'Fehler bei der Verarbeitung: ' . $e->getMessage());

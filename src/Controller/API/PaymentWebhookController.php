@@ -86,7 +86,7 @@ class PaymentWebhookController extends AbstractController
                 $paymentData['amount'] / 100, // Convert cents to euros
                 'EUR',
                 new \DateTimeImmutable(),
-                ucfirst($source) . ' App Notification',
+                ucfirst($source),
                 [
                     'source' => 'mobile_webhook_' . $source,
                     'reference' => $text,

@@ -168,6 +168,60 @@
                                 </div>
                             </div>
                             
+                            <!-- Processing Details -->
+                            {% if payment.processedAt or payment.processingNotes or relatedTransactions %}
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">Verarbeitungsdetails</h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if payment.processingNotes %}
+                                        <div class="mb-3">
+                                            <strong>Verarbeitungsnotizen:</strong>
+                                            <div class="mt-1">
+                                                <small class="text-muted">{{ payment.processingNotes|nl2br }}</small>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    {% if relatedTransactions %}
+                                        <div class="mb-3">
+                                            <strong>Zugehörige Transaktionen:</strong>
+                                            <div class="mt-2">
+                                                {% for transaction in relatedTransactions %}
+                                                    <div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">
+                                                        <div>
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="badge badge-{% if transaction.amount >= 0 %}success{% else %}danger{% endif %} mr-2">
+                                                                    {{ (transaction.amount / 100)|number_format(2, ',', '.') }} €
+                                                                </span>
+                                                                <span class="badge badge-secondary mr-2">{{ transaction.category|upper }}</span>
+                                                                {% if transaction.type == constant('App\\Entity\\UserTransaction::TYPE_ORDER_PAYMENT') %}
+                                                                    <span class="badge badge-info mr-2">Shop-Bestellung</span>
+                                                                {% elseif transaction.type == constant('App\\Entity\\UserTransaction::TYPE_CATERING_CREDIT') %}
+                                                                    <span class="badge badge-success mr-2">Catering-Guthaben</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            {% if transaction.description %}
+                                                                <small class="text-muted d-block mt-1">{{ transaction.description }}</small>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="text-right">
+                                                            <small class="text-muted">{{ transaction.createdAt|date('d.m.Y H:i') }}</small>
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    {% if not payment.processedAt and not payment.processingNotes and not relatedTransactions %}
+                                        <p class="text-muted mb-0">Diese Zahlung wurde noch nicht verarbeitet.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            
                             <!-- Metadata -->
                             {% if payment.metadata %}
                             <div class="card mb-4">
