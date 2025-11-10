@@ -218,6 +218,9 @@ final class IdmManager
      */
     private function send(string $method, string $url, array &$response, array $expectedErrorCodes = [], array $query = [], array $json_payload = []): bool|int
     {
+        // $dateString = date('Y-m-d H:i:s');
+        // file_put_contents(__DIR__ . '/../../var/log/idm_manager.log', "[$dateString] Attempting $method request to $url with data: " . json_encode($json_payload) . PHP_EOL, FILE_APPEND);
+        
         try {
             $options = [];
             if (!empty($query)) {
@@ -290,10 +293,8 @@ final class IdmManager
             }
         }
 
-        // error_log('Attempting POST request with data: ' . json_encode($data));
         $code = $this->send('POST', $url, $response, [Response::HTTP_CONFLICT], [], $data);
-        // error_log('POST response: ' . json_encode($response));
-
+        
         $this->throwOnCode($code, $object);
 
         return $response;

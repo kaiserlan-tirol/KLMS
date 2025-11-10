@@ -115,6 +115,9 @@ class User
     #[Groups(['read', 'write'])]
     private ?string $statements = null;
 
+    #[Groups(['read', 'write'])]
+    private ?int $dogTagGroup = null;
+
     #[Idm\Collection(class: Clan::class)]
     #[Groups(['read'])]
     private Collection|array $clans = [];
@@ -451,6 +454,18 @@ class User
     public function setClans(Collection|array $clans): self
     {
         $this->clans = $clans;
+
+        return $this;
+    }
+
+    public function getDogTagGroup(): ?int
+    {
+        return $this->dogTagGroup;
+    }
+
+    public function setDogTagGroup(?int $dogTagGroup): self
+    {
+        $this->dogTagGroup = $dogTagGroup;
 
         return $this;
     }

@@ -36,10 +36,10 @@ class ShopController extends AbstractController
 
     #[Route(path: '', name: '', methods: ['GET'])]
     public function index(): Response {
-        $orders = $this->orderRepository->findAll();
+        $ordersWithUsers = $this->shopService->getOrders();
 
         return $this->render('admin/shop/index.html.twig', [
-            'orders' => $orders
+            'ordersWithUsers' => $ordersWithUsers
         ]);
     }
 

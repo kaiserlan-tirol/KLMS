@@ -399,13 +399,18 @@ class ShopService
         $orders = $this->orderRepository->findAll();
         $uuids = array_map(fn($o) => $o->getOrderer(), $orders);
 
-        // preload users
-        $this->userRepo->findById($uuids);
+        // Bulk fetch users and index by UUID
+        $users = $this->userRepo->findById($uuids);
+        $usersByUuid = [];
+        foreach ($users as $user) {
+            $usersByUuid[$user->getUuid()->toString()] = $user;
+        }
 
         $result = [];
         foreach ($orders as $item) {
+            $uuid = $item->getOrderer()->toString();
             $result[] = [
-                'user' => $this->userRepo->findOneById($item->getOrderer()),
+                'user' => $usersByUuid[$uuid] ?? null,
                 'order' => $item
             ];
         }
@@ -421,13 +426,21 @@ class ShopService
         $sop = $this->shopOrderPositionRepository->getOrderedAddons($filter);
         $uuids = array_map(fn($p) => $p->getOrder()->getOrderer(), $sop);
 
-        // preload users
-        $this->userRepo->findById($uuids);
+        // Bulk fetch users and index by UUID
+        $users = $this->userRepo->findById($uuids);
+        $usersByUuid = [];
+        foreach ($users as $user) {
+            $usersByUuid[$user->getUuid()->toString()] = $user;
+        }
 
         $result = [];
         foreach ($sop as $item) {
-            $result[] = ['user' => $this->userRepo->findOneById($item->getOrder()->getOrderer()),
-                'text' => $item->getText(), 'price' => $item->getPrice()];
+            $uuid = $item->getOrder()->getOrderer()->toString();
+            $result[] = [
+                'user' => $usersByUuid[$uuid] ?? null,
+                'text' => $item->getText(), 
+                'price' => $item->getPrice()
+            ];
         }
         return $result;
     }

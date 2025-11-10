@@ -60,7 +60,7 @@
                                     <div class="col-md-5 text-center">
                                         <h6 class="mb-3">Banking QR-Code</h6>
                                         <img 
-                                            src="data:image/png;base64,{{ qr_code_data_uri('BCD\n001\n1\nSCT\nREVOLT21\nKaiserLAN Edenhauser\nLT863250018735876769\nEUR' ~ (total_open_orders/100) ~ '\n\n' ~ app.user.user.nickname ~ ', Catering')|replace({'data:image/png;base64,': ''}) }}" 
+                                            src="data:image/png;base64,{{ qr_code_data_uri('BCD\n001\n1\nSCT\nREVOLT21\nMarkus Edenhauser\nLT863250018735876769\nEUR' ~ (total_open_orders/100) ~ '\n\n' ~ app.user.user.nickname ~ ', Catering')|replace({'data:image/png;base64,': ''}) }}" 
                                             alt="QR-Code für Überweisung" 
                                             class="img-fluid rounded"
                                             title="Scan mit Banking-App für einfache Überweisung"

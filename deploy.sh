@@ -7,10 +7,11 @@ set +e
 LANFOLDER="lan03"
 BASE_DIR=`dirname $0`
 
+
 # echo "Build prod assets"
 # npm run build
 
-echo "Push data"
+echo "Push data to $LANFOLDER.kaiserlan.at"
 rsync -avzh --exclude-from=".deployignore" --delete * -e "ssh -p 822" headshot_ftp@neu.headshot.at:/$LANFOLDER.kaiserlan.at/
 
 echo -e "\nRsynced data, clearing cache\n"
@@ -19,3 +20,4 @@ ssh -p 822 headshot_ftp@neu.headshot.at "rm -rf /$LANFOLDER.kaiserlan.at/var/cac
 # commands
 # bash-4.4$ /.phpenv/versions/8.3/bin/php bin/console cache:clear
 # /.phpenv/versions/8.3/bin/php bin/console doctrine:schema:update --force --complete
+# ssh -p 822 headshot_ftp@neu.headshot.at "tail -f /lan03.kaiserlan.at/var/log/idm_manager.log"
