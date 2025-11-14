@@ -90,16 +90,16 @@
                                     "
                                     data-chair-position="{{ seat.chairPosition.value }}" data-toggle="ajaxModal"
                                     data-html="true" title="{{ include('site/seatmap/tooltip.html.twig') }}" href="{{ path('seatmap_seat_show', {'id' : seat.id}) }}">
-                                    {% if taken %}
+                                    {% if taken or reserved %}
                                     {% if printView %}
-                                        {% if seat.id in users | keys and users[seat.id] is not empty %}
+                                        {% if seat.id in users | keys %}
+                                        {% set clan = seat.id in clans | keys and clans[seat.id] is not empty ? clans[seat.id] : null %}
+                                        {% set user = seat.id in users | keys and users[seat.id] is not empty ? users[seat.id] : null %}
                                         <div class="print-info">
-                                            <div class="print-nickname" style="text-align: {{ users[seat.id].nickname|length > 12 ? 'left': 'center' }}">
-                                                <!-- Sitzplatz: {{ seat.generateSeatName }}<br/> -->
-                                                {% set user = seat.id in users | keys and users[seat.id] is not empty ? users[seat.id] : null %}
-                                                {% set clan = seat.id in clans | keys and clans[seat.id] is not empty ? clans[seat.id] : null %}
-                                                {% if user %}{{ user.nickname }}{% endif %}
+                                            <div class="print-nickname" style="text-align: {{ users[seat.id].nickname is defined and users[seat.id].nickname|length > 12 ? 'left': 'center' }}">
+                                                {% if user %}{{ user.nickname }}{% else %}&nbsp;{% endif %}
                                             </div>
+
                                             {% if clan %}<div class="print-clantag">{{ clan.clantag }}</div>{% endif %}
                                         </div>
                                         {% endif %}
@@ -130,6 +130,79 @@
             --seatmap-seat-border-radius: {{ settings.get('lan.seatmap.styles.seat_border_radius', 10) }}px;
         }
         {% if printView %}
+        /* Hide all page elements except seatmap for print view */
+        #top-bar,
+        #header,
+        #main-nav,
+        #footer,
+        .flash-msg-wrap,
+        .card-title,
+        .container.my-2,
+        .seatmap-legend,
+        #main .container > .card:first-child {
+            display: none !important;
+        }
+        
+        /* Make body and main containers take full page */
+        body,
+        html {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+        }
+        
+        #main {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 100vh !important;
+        }
+        
+        .container {
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        .card {
+            border: none !important;
+            margin: 0 !important;
+            height: 100vh !important;
+        }
+        
+        .card-body {
+            padding: 0 !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+        }
+        
+        /* Make seatmap take full page */
+        .seatmap {
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            position: relative !important;
+        }
+        
+        .seatmap-bg {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+        }
+        
+        .seatmap-wrapper {
+            background: white;
+            width: 100% !important;
+            height: 100% !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+        }
+        
+        /* Seat styles for print */
         .print-info {
             text-align: center;
         }
@@ -147,9 +220,6 @@
             color: black;
             font-size: 5px;
             margin-top: -1px;
-        }
-        .seatmap-wrapper {
-            background: white;
         }
         .seatmap-wrapper .seat {
             border: 1px solid #555 !important;

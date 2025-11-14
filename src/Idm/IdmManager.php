@@ -218,8 +218,7 @@ final class IdmManager
      */
     private function send(string $method, string $url, array &$response, array $expectedErrorCodes = [], array $query = [], array $json_payload = []): bool|int
     {
-        // $dateString = date('Y-m-d H:i:s');
-        // file_put_contents(__DIR__ . '/../../var/log/idm_manager.log', "[$dateString] Attempting $method request to $url with data: " . json_encode($json_payload) . PHP_EOL, FILE_APPEND);
+        // file_put_contents(__DIR__ . '/../../var/log/idm_manager.log', "[" . date('Y-m-d H:i:s') . "] Attempting $method request to $url with data: " . json_encode($json_payload) . PHP_EOL, FILE_APPEND);
         
         try {
             $options = [];

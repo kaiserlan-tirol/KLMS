@@ -80,10 +80,10 @@ class TransactionService
      */
     public function processOrderPayment(CateringOrder $order): UserTransaction
     {
-        $amount = -$order->getTotalPriceCents(); // Negative for deduction
+        $amount = -$order->getTotalPrice(); // Negative for deduction
         
         $transaction = new UserTransaction();
-        $transaction->setUser($order->getUser())
+        $transaction->setUser($order->getOrderer())
             ->setType(UserTransaction::TYPE_ORDER_PAYMENT)
             ->setCategory(UserTransaction::CATEGORY_CATERING)
             ->setAmount($amount)
@@ -96,11 +96,11 @@ class TransactionService
         $this->entityManager->beginTransaction();
         try {
             $this->transactionRepository->save($transaction);
-            $this->updateUserBalance($order->getUser());
+            $this->updateUserBalance($order->getOrderer());
             $this->entityManager->commit();
 
             $this->logger->info('Order payment processed', [
-                'user' => $order->getUser()->toString(),
+                'user' => $order->getOrderer()->toString(),
                 'order_id' => $order->getId(),
                 'amount' => $amount,
                 'transaction_id' => $transaction->getId()
@@ -110,7 +110,7 @@ class TransactionService
         } catch (\Exception $e) {
             $this->entityManager->rollback();
             $this->logger->error('Failed to process order payment', [
-                'user' => $order->getUser()->toString(),
+                'user' => $order->getOrderer()->toString(),
                 'order_id' => $order->getId(),
                 'error' => $e->getMessage()
             ]);
@@ -123,10 +123,10 @@ class TransactionService
      */
     public function processOrderRefund(CateringOrder $order): UserTransaction
     {
-        $amount = $order->getTotalPriceCents(); // Positive for credit restoration
+        $amount = $order->getTotalPrice(); // Positive for credit restoration
         
         $transaction = new UserTransaction();
-        $transaction->setUser($order->getUser())
+        $transaction->setUser($order->getOrderer())
             ->setType(UserTransaction::TYPE_ORDER_REFUND)
             ->setCategory(UserTransaction::CATEGORY_CATERING)
             ->setAmount($amount)
@@ -139,11 +139,11 @@ class TransactionService
         $this->entityManager->beginTransaction();
         try {
             $this->transactionRepository->save($transaction);
-            $this->updateUserBalance($order->getUser());
+            $this->updateUserBalance($order->getOrderer());
             $this->entityManager->commit();
 
             $this->logger->info('Order refund processed', [
-                'user' => $order->getUser()->toString(),
+                'user' => $order->getOrderer()->toString(),
                 'order_id' => $order->getId(),
                 'amount' => $amount,
                 'transaction_id' => $transaction->getId()
@@ -153,7 +153,7 @@ class TransactionService
         } catch (\Exception $e) {
             $this->entityManager->rollback();
             $this->logger->error('Failed to process order refund', [
-                'user' => $order->getUser()->toString(),
+                'user' => $order->getOrderer()->toString(),
                 'order_id' => $order->getId(),
                 'error' => $e->getMessage()
             ]);
