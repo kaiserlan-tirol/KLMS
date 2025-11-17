@@ -68,10 +68,13 @@
                               <p class="mb-2">
                                   <strong>Verwendungszweck:</strong> {{ app.user.user.nickname }}, Catering
                               </p>
+                              <p>Scanne den QR-Code mit deiner Banking-App.</p>
                                 </div>
                                 <div class="col-4 text-right">
+                                    {# SEPA QR: Replace EUR0 with amount to pay (positive). If credit_balance is negative, use its absolute value; else leave 0. #}
+                                    {% set qrAmount = credit_balance < 0 ? (credit_balance * -1 / 100)|number_format(2, '.', '') : '0' %}
                                     <img 
-                                            src="data:image/png;base64,{{ qr_code_data_uri('BCD\n001\n1\nSCT\nREVOLT21\nMarkus Edenhauser\nLT863250018735876769\nEUR0\n\n' ~ app.user.user.nickname ~ ', Catering')|replace({'data:image/png;base64,': ''}) }}" 
+                                        src="data:image/png;base64,{{ qr_code_data_uri('BCD\n001\n1\nSCT\nREVOLT21\nMarkus Edenhauser\nLT863250018735876769\nEUR' ~ qrAmount ~ '\n\n' ~ app.user.user.nickname ~ ', Catering')|replace({'data:image/png;base64,': ''}) }}" 
                                             alt="QR-Code für Überweisung" 
                                             class="img-fluid"
                                             title="Scan mit Banking-App für einfache Überweisung"
@@ -85,7 +88,7 @@
             
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Transaktionshistorie</h5>
+                    <h5 class="mb-0">Bestellungen &amp; Transaktionen</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -104,9 +107,18 @@
                                         <tr>
                                             <td>{{ transaction.timestamp|date('d.m.Y H:i') }}</td>
                                             <td>
-                                                {{ transaction.description }}
-                                                {% if transaction.order %}
-                                                    <small class="text-muted">(Bestellung #{{ transaction.order.id }})</small>
+                                                {# Normalize legacy English descriptions to new wording without altering DB #}
+                                                {% set displayDesc = transaction.description %}
+                                                {% if displayDesc starts with 'Payment for catering order #' %}
+                                                    {% set orderId = displayDesc|replace({'Payment for catering order #':''}) %}
+                                                    {% set displayDesc = 'Bestellung #' ~ orderId %}
+                                                {% elseif displayDesc starts with 'Refund for catering order #' %}
+                                                    {% set orderId = displayDesc|replace({'Refund for catering order #':''}) %}
+                                                    {% set displayDesc = 'Rückerstattung Bestellung #' ~ orderId %}
+                                                {% endif %}
+                                                {{ displayDesc }}
+                                                {% if transaction.type == 'order_payment' and transaction.orderItemsInline %}
+                                                        - {{ transaction.orderItemsInline }}
                                                 {% endif %}
                                             </td>
                                             <td class="{% if transaction.amount >= 0 %}text-success{% else %}text-danger{% endif %}">

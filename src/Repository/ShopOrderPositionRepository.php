@@ -72,15 +72,20 @@ class ShopOrderPositionRepository extends ServiceEntityRepository
         $q = $qb->select('identity(op.addon) as aid, count(op) as cnt')
             ->from(ShopOrderPositionAddon::class, 'op')
             ->groupBy('op.addon')
-            ->join('op.order', 'o');
+            ->join('op.order', 'o')
+            // join ticket + ticket entity to allow filtering by ticket redeemer
+            ->leftJoin('op.ticket', 'ticket_pos')
+            ->leftJoin('ticket_pos.ticket', 't');
         if (!empty($statusFilter)) {
            $q
                ->andWhere('o.status in (:status)')
-               ->setPaRAMETER('status', $statusFilter);
+               ->setParameter('status', $statusFilter);
         }
         if (!is_null($uuid)) {
+            // Include addons purchased by the user (orderer) OR attached to tickets redeemed by the user.
+            // Addons without ticket (op.ticket IS NULL) only belong to the orderer.
             $q
-                ->andWhere('o.orderer = :uuid')
+                ->andWhere('(o.orderer = :uuid OR t.redeemer = :uuid)')
                 ->setParameter('uuid', $uuid);
         }
         return array_column($q->getQuery()->getArrayResult(), 'cnt', 'aid');
@@ -98,16 +103,18 @@ class ShopOrderPositionRepository extends ServiceEntityRepository
         $q = $qb->select('count(op)')
             ->from(ShopOrderPositionAddon::class, 'op')
             ->join('op.order', 'o')
+            ->leftJoin('op.ticket', 'ticket_pos')
+            ->leftJoin('ticket_pos.ticket', 't')
             ->andWhere('op.addon = :addon')
             ->setParameter('addon', $addon);
         if (!empty($statusFilter)) {
             $q
                 ->andWhere('o.status in (:status)')
-                ->setPaRAMETER('status', $statusFilter);
+                ->setParameter('status', $statusFilter);
         }
         if (!is_null($uuid)) {
             $q
-                ->andWhere('o.orderer = :uuid')
+                ->andWhere('(o.orderer = :uuid OR t.redeemer = :uuid)')
                 ->setParameter('uuid', $uuid);
         }
         return $q->getQuery()->getSingleScalarResult();
@@ -160,18 +167,21 @@ class ShopOrderPositionRepository extends ServiceEntityRepository
         $q = $qb->select('identity(op.ticket) as ticket_id, identity(op.addon) as addon_id, count(op) as cnt')
             ->from(ShopOrderPositionAddon::class, 'op')
             ->join('op.order', 'o')
+            ->leftJoin('op.ticket', 'ticket_pos')
+            ->leftJoin('ticket_pos.ticket', 't')
             ->where('op.ticket IS NOT NULL')
             ->groupBy('op.ticket, op.addon');
-            
+
         if (!empty($statusFilter)) {
-           $q->andWhere('o.status in (:status)')
-             ->setParameter('status', $statusFilter);
+            $q->andWhere('o.status in (:status)')
+              ->setParameter('status', $statusFilter);
         }
         if (!is_null($uuid)) {
-            $q->andWhere('o.orderer = :uuid')
+            // Include addons belonging to the orderer or to tickets redeemed by the user
+            $q->andWhere('(o.orderer = :uuid OR t.redeemer = :uuid)')
               ->setParameter('uuid', $uuid);
         }
-        
+
         $results = $q->getQuery()->getArrayResult();
         $formatted = [];
         foreach ($results as $result) {
@@ -183,7 +193,7 @@ class ShopOrderPositionRepository extends ServiceEntityRepository
             }
             $formatted[$ticketId][$addonId] = $count;
         }
-        
+
         return $formatted;
     }
 

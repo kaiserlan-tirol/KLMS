@@ -395,4 +395,70 @@ class UserTransaction
         $this->processingNotes = 'Marked as duplicate of transaction #' . $originalTransaction->getId();
         return $this;
     }
+
+    public function getTimestamp(): ?\DateTimeImmutable
+    {
+        // Prefer processedAt if set, else createdAt
+        return $this->processedAt ?? $this->createdAt;
+    }
+
+    /**
+     * Virtual accessor used by legacy Twig templates: transaction.order
+     * Returns a CateringOrder entity if this transaction is linked to a catering order.
+     * For shop orders we only store the numeric ID (shopOrderId) without FK; Twig templates
+     * expect an object with an id property, so we provide a lightweight value object wrapper.
+     * If neither is present returns null.
+     */
+    public function getOrder(): object|null
+    {
+        if ($this->cateringOrder) {
+            return $this->cateringOrder; // has getId()
+        }
+        if ($this->shopOrderId) {
+            // Anonymous value object with id property for Twig access
+            return (object) ['id' => $this->shopOrderId];
+        }
+        return null;
+    }
+
+    /**
+     * Convenience to get numeric order id regardless of type.
+     */
+    public function getOrderId(): ?int
+    {
+        if ($this->cateringOrder) {
+            return $this->cateringOrder->getId();
+        }
+        return $this->shopOrderId;
+    }
+
+    /**
+     * Return an array of textual representations of items contained in the linked catering order.
+     * Empty array if no catering order is linked or it has no positions.
+     * Each entry already contains the quantity (e.g. "2x Toast") via CateringOrderPosition::getText().
+     */
+    public function getOrderItems(): array
+    {
+        if (!$this->cateringOrder) {
+            return [];
+        }
+        $items = [];
+        foreach ($this->cateringOrder->getCateringOrderPositions() as $position) {
+            // Defensive: ensure method exists and quantity/name present
+            $items[] = $position->getText();
+        }
+        return $items;
+    }
+
+    /**
+     * Inline, comma-separated list of order items for display in history tables.
+     */
+    public function getOrderItemsInline(): string
+    {
+        $items = $this->getOrderItems();
+        if (empty($items)) {
+            return '';
+        }
+        return implode(', ', $items);
+    }
 }

@@ -118,9 +118,12 @@ class UserTransactionRepository extends ServiceEntityRepository
      */
     public function findRecentTransactions(UuidInterface $user, int $limit = 10): array
     {
+        // Eager load catering order + positions to avoid N+1 when rendering order item summaries
         return $this->createQueryBuilder('t')
             ->andWhere('t.user = :user')
             ->setParameter('user', $user)
+            ->leftJoin('t.cateringOrder', 'o')->addSelect('o')
+            ->leftJoin('o.cateringOrderPositions', 'p')->addSelect('p')
             ->orderBy('t.createdAt', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()

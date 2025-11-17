@@ -1,0 +1,71 @@
+{% extends 'admin/adminBase.html.twig' %}
+
+{% block title %}Addon zur Bestellung #{{ order.id }} hinzufügen{% endblock %}
+
+{% block main %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-plus"></i>
+                        Addon zur Bestellung #{{ order.id }} hinzufügen
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Besteller:</strong> {{ order.orderer | username }}<br>
+                        <strong>Bestelldatum:</strong> {{ order.createdAt | date('d.m.Y H:i') }}<br>
+                        <strong>Status:</strong> 
+                        {% if order.isNew %}
+                            <span class="badge badge-warning">Neu</span>
+                        {% elseif order.isCreated %}
+                            <span class="badge badge-info">Erstellt</span>
+                        {% elseif order.isPaid %}
+                            <span class="badge badge-success">Bezahlt</span>
+                        {% elseif order.isCanceled %}
+                            <span class="badge badge-secondary">Storniert</span>
+                        {% elseif order.isRefunded %}
+                            <span class="badge badge-info">Rückerstattet</span>
+                        {% endif %}
+                    </div>
+                    
+                    {% if order.isRefunded %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Diese Bestellung wurde rückerstattet und kann nicht mehr bearbeitet werden.
+                        </div>
+                        <a href="{{ path('admin_shop_show', {'id': order.id}) }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Zurück zur Bestellung
+                        </a>
+                    {% else %}
+                        {{ form_start(form) }}
+                            <div class="form-group mb-3">
+                                {{ form_label(form.addon, 'Addon auswählen') }}
+                                {{ form_widget(form.addon, {'attr': {'class': 'form-control'}}) }}
+                                {{ form_errors(form.addon) }}
+                                <small class="form-text text-muted">Wählen Sie das Addon aus, das zur Bestellung hinzugefügt werden soll.</small>
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                {{ form_label(form.quantity, 'Anzahl') }}
+                                {{ form_widget(form.quantity, {'attr': {'class': 'form-control', 'min': 1}}) }}
+                                {{ form_errors(form.quantity) }}
+                                <small class="form-text text-muted">Anzahl des Addons.</small>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between">
+                                <a href="{{ path('admin_shop_show', {'id': order.id}) }}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> Zurück zur Bestellung
+                                </a>
+                                {{ form_widget(form.submit, {'attr': {'class': 'btn btn-primary'}}) }}
+                            </div>
+                        {{ form_end(form) }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

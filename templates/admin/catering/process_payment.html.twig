@@ -15,86 +15,7 @@
     </div>
     
     <div class="row">
-        <div class="col-md-7">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Bestellübersicht</h5>
-                </div>
-                <div class="card-body p-0">
-                    {% if payment_sent_orders|length > 0 %}
-                        <div class="alert alert-info m-3">
-                            <h6 class="font-weight-bold"><i class="fas fa-info-circle"></i> Bestellungen mit Status "Zahlung gesendet"</h6>
-                            <p class="mb-1">Der Benutzer hat für diese Bestellungen angegeben, dass er die Zahlung bereits gesendet hat.</p>
-                            <p class="mb-0">Gesamtbetrag: <strong>{{ (total_payment_sent/100) | format_currency('EUR') }}</strong></p>
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-striped mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Bestellung #</th>
-                                        <th>Datum</th>
-                                        <th>Betrag</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for order in payment_sent_orders %}
-                                        <tr>
-                                            <td>
-                                                <a href="{{ path('admin_catering_show', {'id': order.id}) }}" target="_blank">
-                                                    #{{ order.id }}
-                                                </a>
-                                            </td>
-                                            <td>{{ order.createdAt|date('d.m.Y H:i') }}</td>
-                                            <td>{{ (order.calculateTotal/100) | format_currency('EUR') }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="alert alert-success m-3">
-                            <i class="far fa-check-circle"></i> Keine Bestellungen mit Status "Zahlung gesendet" vorhanden.
-                        </div>
-                    {% endif %}
-                    
-                    {% if open_orders|length > 0 %}
-                        <div class="alert alert-warning m-3 mt-0">
-                            <h6 class="font-weight-bold"><i class="fas fa-exclamation-triangle"></i> Offene Bestellungen</h6>
-                            <p class="mb-1">Diese Bestellungen sind noch offen (nicht als "Zahlung gesendet" markiert).</p>
-                            <p class="mb-0">Gesamtbetrag: <strong>{{ (total_open_orders/100) | format_currency('EUR') }}</strong></p>
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-striped mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Bestellung #</th>
-                                        <th>Datum</th>
-                                        <th>Betrag</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for order in open_orders %}
-                                        <tr>
-                                            <td>
-                                                <a href="{{ path('admin_catering_show', {'id': order.id}) }}" target="_blank">
-                                                    #{{ order.id }}
-                                                </a>
-                                            </td>
-                                            <td>{{ order.createdAt|date('d.m.Y H:i') }}</td>
-                                            <td>{{ (order.calculateTotal/100) | format_currency('EUR') }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-5">
+        <div class="col-md-6">
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">Zahlung verarbeiten</h5>
@@ -114,11 +35,10 @@
                                     <span class="input-group-text"><i class="fas fa-euro-sign"></i></span>
                                 </div>
                                 <input type="number" id="payment_amount" name="payment_amount" class="form-control" step="0.01" 
-                                       value="{{ (total_payment_sent/100) }}" min="0.01" required>
+                                       value="0.00" min="0.01" required>
                             </div>
                             <small class="form-text text-muted">
-                                Geben Sie den tatsächlichen Betrag ein, den der Benutzer bezahlt hat. 
-                                Überschüssiger Betrag wird automatisch als Guthaben gespeichert.
+                                Geben Sie den Betrag ein, der vollständig als Guthaben verbucht werden soll.
                             </small>
                         </div>
                         
@@ -134,16 +54,72 @@
                             </button>
                         </div>
                     </form>
-                    
-                    <hr>
-                    
-                    <div class="alert alert-warning">
-                        <h6 class="font-weight-bold"><i class="fas fa-info-circle"></i> Hinweis zur Verarbeitung:</h6>
-                        <ul class="mb-0">
-                            <li>Die ältesten "Zahlung gesendet" Bestellungen werden zuerst bezahlt</li>
-                            <li>Falls kein/wenig Geld für "Zahlung gesendet" Bestellungen übrig ist, wird es als Guthaben gutgeschrieben</li>
-                            <li>Falls zu wenig Geld für alle Bestellungen eingegangen ist, bleiben die restlichen im Status "Zahlung gesendet"</li>
-                        </ul>
+                    <div class="alert alert-secondary mt-3 mb-0">
+                        <i class="fas fa-info-circle"></i> Zahlungen werden nicht mehr einzelnen Bestellungen zugeordnet, sondern direkt als Guthaben geführt.
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Transaktionshistorie</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Datum</th>
+                                    <th>Beschreibung</th>
+                                    <th>Betrag</th>
+                                    <th>Typ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if transactions|length > 0 %}
+                                    {% for transaction in transactions %}
+                                        <tr>
+                                            <td>{{ transaction.timestamp|date('d.m.Y H:i') }}</td>
+                                            <td>
+                                                {% set displayDesc = transaction.description %}
+                                                {% if displayDesc starts with 'Payment for catering order #' %}
+                                                    {% set orderId = displayDesc|replace({'Payment for catering order #':''}) %}
+                                                    {% set displayDesc = 'Bestellung #' ~ orderId %}
+                                                {% elseif displayDesc starts with 'Refund for catering order #' %}
+                                                    {% set orderId = displayDesc|replace({'Refund for catering order #':''}) %}
+                                                    {% set displayDesc = 'Rückerstattung Bestellung #' ~ orderId %}
+                                                {% endif %}
+                                                {{ displayDesc }}
+                                                {% if transaction.type == 'order_payment' and transaction.orderItemsInline %}
+                                                    <div class="mt-1">
+                                                        {{ transaction.orderItemsInline }}
+                                                    </div>
+                                                {% endif %}
+                                            </td>
+                                            <td class="{% if transaction.amount >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                                {{ (transaction.amount/100) | format_currency('EUR') }}
+                                            </td>
+                                            <td>
+                                                {% if transaction.type == 'payment_received' %}
+                                                    <span class="badge badge-success">Einzahlung</span>
+                                                {% elseif transaction.type == 'order_payment' %}
+                                                    <span class="badge badge-primary">Bestellung</span>
+                                                {% elseif transaction.type == 'credit_adjustment' %}
+                                                    <span class="badge badge-info">Anpassung</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center py-3">
+                                            Keine Transaktionen vorhanden.
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

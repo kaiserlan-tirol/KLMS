@@ -10,6 +10,8 @@ enum ShopOrderHistoryAction : string
     case PaymentNotice = 'payment_notice';
     case OrderRefunded = 'payment_refunded';
     case OrderCanceled = 'payment_canceled';
+    case AddonAdded = 'addon_added';
+    case AddonAddFailed = 'addon_add_failed';
     
     /**
      * Get a formatted display value for the action
@@ -25,6 +27,8 @@ enum ShopOrderHistoryAction : string
             self::PaymentNotice => 'Zahlungshinweis',
             self::OrderRefunded => 'Bestellung rückerstattet',
             self::OrderCanceled => 'Bestellung storniert',
+            self::AddonAdded => 'Addon hinzugefügt',
+            self::AddonAddFailed => 'Addon hinzufügen fehlgeschlagen',
         };
     }
 }

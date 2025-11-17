@@ -90,7 +90,8 @@ class TransactionService
             ->setSource('catering_order')
             ->setReferenceType('catering_order')
             ->setReferenceId((string) $order->getId())
-            ->setDescription("Payment for catering order #{$order->getId()}")
+            ->setDescription("Bestellung #{$order->getId()}")
+            ->setCateringOrder($order)
             ->setStatus(UserTransaction::STATUS_COMPLETED);
 
         $this->entityManager->beginTransaction();
@@ -133,7 +134,8 @@ class TransactionService
             ->setSource('catering_order')
             ->setReferenceType('catering_order')
             ->setReferenceId((string) $order->getId())
-            ->setDescription("Refund for catering order #{$order->getId()}")
+            ->setDescription("Rückerstattung Bestellung #{$order->getId()}")
+            ->setCateringOrder($order)
             ->setStatus(UserTransaction::STATUS_COMPLETED);
 
         $this->entityManager->beginTransaction();

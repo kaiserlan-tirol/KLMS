@@ -489,28 +489,8 @@ class CateringController extends AbstractController {
             return $this->redirectToRoute('admin_catering_payments');
         }
         
-        // Get user's payment sent orders
-        $paymentSentOrders = $this->orderRepository->findBy([
-            'orderer' => $user->getUuid(),
-            'status' => \App\Entity\CateringOrderStatus::PaymentSent
-        ], ['createdAt' => 'ASC']);
-        
-        // Also get any open orders
-        $openOrders = $this->orderRepository->findBy([
-            'orderer' => $user->getUuid(),
-            'status' => \App\Entity\CateringOrderStatus::Created
-        ], ['createdAt' => 'ASC']);
-        
-        // Calculate totals
-        $totalPaymentSent = 0;
-        foreach ($paymentSentOrders as $order) {
-            $totalPaymentSent += $order->calculateTotal();
-        }
-        
-        $totalOpenOrders = 0;
-        foreach ($openOrders as $order) {
-            $totalOpenOrders += $order->calculateTotal();
-        }
+        // Legacy concept of offene / Zahlung gesendet Bestellungen removed.
+        // Orders are considered closed on placement and reflected only through transactions & balance.
         
         // Get current credit balance
         $currentCredit = $this->cateringService->getUserCredit($user);
@@ -558,66 +538,75 @@ class CateringController extends AbstractController {
     }
     
     #[Route(path: '/credit-management', name:'_credit_management', methods: ['GET'])]
-    public function creditManagement(): Response
+    public function creditManagement(Request $request): Response
     {
-        // Get all users with credit
-        $usersWithCredit = $this->em->getRepository(\App\Entity\UserCateringCredit::class)->findAll();
-        
-        // Get all users who have placed catering orders
-        $qb = $this->orderRepository->createQueryBuilder('o')
+        // Collect UUIDs from orders
+        $orderUserUuidRows = $this->orderRepository->createQueryBuilder('o')
             ->select('DISTINCT o.orderer')
-            ->getQuery();
-        
-        $orderUserIds = $qb->getResult();
-        
-        // Create a map of user UUIDs to credit amounts
-        $creditMap = [];
-        foreach ($usersWithCredit as $credit) {
-            $creditMap[$credit->getUser()->toString()] = $credit->getAmount();
+            ->getQuery()
+            ->getResult();
+
+        $orderUuids = array_map(fn($row) => $row['orderer'], $orderUserUuidRows);
+
+        // Collect UUIDs that have any balance record (UserBalance table)
+        $balanceRows = $this->em->getRepository(\App\Entity\UserBalance::class)
+            ->createQueryBuilder('b')
+            ->select('b.user')
+            ->getQuery()
+            ->getResult();
+        $balanceUuids = array_map(fn($row) => $row['user'], $balanceRows);
+
+        // Merge and deduplicate UUIDs
+        $allUuids = [];
+        foreach ([$orderUuids, $balanceUuids] as $set) {
+            foreach ($set as $uuid) { $allUuids[$uuid->toString()] = $uuid; }
         }
-        
-        // Format user data for all users
+
+        // Bulk fetch all users involved either by order or balance
+        $users = $this->userRepo->findById(array_values($allUuids));
+        $usersByUuid = [];
+        foreach ($users as $user) {
+            $usersByUuid[$user->getUuid()->toString()] = $user;
+        }
+
+        // Build user data with current credit via CateringService (transaction-based)
         $userData = [];
-        
-        // First add users with credit
-        foreach ($usersWithCredit as $credit) {
-            $user = $this->userRepo->findOneById($credit->getUser());
-            if ($user) {
-                $userData[] = [
-                    'user' => $user,
-                    'credit' => $credit->getAmount(),
-                    'has_ordered' => true,
-                ];
-            }
-        }
-        
-        // Then add users who placed orders but don't have credit yet
-        foreach ($orderUserIds as $uuidArray) {
-            $uuid = $uuidArray['orderer'];
+        foreach ($allUuids as $uuidString => $uuid) {
             $uuidString = $uuid->toString();
-            
-            // Skip users already in the list (with credit)
-            if (isset($creditMap[$uuidString])) {
-                continue;
-            }
-            
-            $user = $this->userRepo->findOneById($uuid);
-            if ($user) {
-                $userData[] = [
-                    'user' => $user,
-                    'credit' => 0,
-                    'has_ordered' => true,
-                ];
+            if (!isset($usersByUuid[$uuidString])) { continue; }
+            $user = $usersByUuid[$uuidString];
+            $currentCredit = $this->cateringService->getUserCredit($user);
+            $userData[] = [
+                'user' => $user,
+                'credit' => $currentCredit,
+                'has_ordered' => in_array($uuid, $orderUuids, true),
+            ];
+        }
+
+        // Sorting handling
+        $sort = $request->query->get('sort', 'credit_desc');
+        switch ($sort) {
+            case 'credit_asc':
+                usort($userData, fn($a,$b) => $a['credit'] <=> $b['credit']);
+                break;
+            case 'credit_desc':
+            default:
+                usort($userData, fn($a,$b) => $b['credit'] <=> $a['credit']);
+                $sort = 'credit_desc';
+        }
+
+        // Gesamtsumme Außenstände (sum of negative credits)
+        $outstandingTotal = 0;
+        foreach ($userData as $ud) {
+            if ($ud['credit'] < 0) {
+                $outstandingTotal += $ud['credit']; // credit already negative
             }
         }
-        
-        // Sort by credit amount (highest first)
-        usort($userData, function($a, $b) {
-            return $b['credit'] - $a['credit'];
-        });
         
         return $this->render('admin/catering/credit_management.html.twig', [
             'users_with_credit' => $userData,
+            'sort' => $sort,
+            'outstanding_total' => $outstandingTotal,
         ]);
     }
     
@@ -734,7 +723,7 @@ class CateringController extends AbstractController {
             $transactionType = $request->request->get('transaction_type');
             $amount = (int)($request->request->get('amount') * 100); // Convert to cents
             $note = $request->request->get('note');
-            $autoApply = $request->request->has('auto_apply');
+            // auto_apply deprecated: removed
             
             if ($amount <= 0) {
                 $this->addFlash('error', 'Der Betrag muss größer als 0 sein.');
@@ -744,14 +733,11 @@ class CateringController extends AbstractController {
             try {
                 switch ($transactionType) {
                     case 'payment':
-                        // Process payment
-                        $result = $this->cateringService->processPayment($user, $amount, $note);
-                        
+                        // Simplified: Treat entire amount as direct credit (no order settlement logic)
+                        $this->transactionService->addManualCredit($user->getUuid(), $amount, 'catering', $note ?: 'Manuelle Zahlung');
                         $this->addFlash('success', sprintf(
-                            'Zahlung über %.2f € wurde verarbeitet. %d Bestellung(en) wurden bezahlt und %.2f € wurden dem Guthaben gutgeschrieben.',
-                            $amount / 100,
-                            $result['orders_processed'],
-                            $result['amount_credited'] / 100
+                            'Zahlung über %.2f € wurde als Guthaben verbucht.',
+                            $amount / 100
                         ));
                         break;
                         
@@ -776,10 +762,7 @@ class CateringController extends AbstractController {
         
         return $this->render('admin/catering/user_financial.html.twig', [
             'user' => $user,
-            'payment_sent_orders' => $paymentSentOrders,
-            'open_orders' => $openOrders,
-            'total_payment_sent' => $totalPaymentSent,
-            'total_open_orders' => $totalOpenOrders,
+            // Removed legacy order lists
             'current_credit' => $currentCredit,
             'transactions' => $transactions,
             'csrf_token' => self::CSRF_TOKEN_PAYED

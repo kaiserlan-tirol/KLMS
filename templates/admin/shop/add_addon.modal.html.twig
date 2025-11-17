@@ -1,0 +1,75 @@
+{% extends 'modal.html.twig' %}
+
+{% block title %}Addon zur Bestellung #{{ order.id }} hinzufügen{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h4>Addon hinzufügen</h4>
+    <p>Fügen Sie ein Addon zur Bestellung #{{ order.id }} von <strong>{{ order.orderer | username }}</strong> hinzu.</p>
+    
+    {% if order.isRefunded %}
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            Diese Bestellung wurde rückerstattet und kann nicht mehr bearbeitet werden.
+        </div>
+    {% else %}
+        {{ form_start(form, {'attr': {'class': 'ajax-form'}}) }}
+            <div class="form-group mb-3">
+                {{ form_label(form.addon, 'Addon auswählen') }}
+                {{ form_widget(form.addon, {'attr': {'class': 'form-control'}}) }}
+                {{ form_errors(form.addon) }}
+                <small class="form-text text-muted">Wählen Sie das Addon aus, das zur Bestellung hinzugefügt werden soll.</small>
+            </div>
+            
+            <div class="form-group mb-3">
+                {{ form_label(form.quantity, 'Anzahl') }}
+                {{ form_widget(form.quantity, {'attr': {'class': 'form-control', 'min': 1}}) }}
+                {{ form_errors(form.quantity) }}
+                <small class="form-text text-muted">Anzahl des Addons.</small>
+            </div>
+            
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Abbrechen</button>
+                {{ form_widget(form.submit, {'attr': {'class': 'btn btn-primary'}}) }}
+            </div>
+        {{ form_end(form) }}
+    {% endif %}
+</div>
+
+<script>
+$(document).ready(function() {
+    $('.ajax-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        var form = $(this);
+        var submitBtn = form.find('button[type="submit"]');
+        var originalText = submitBtn.text();
+        
+        submitBtn.prop('disabled', true).text('Wird hinzugefügt...');
+        
+        $.ajax({
+            url: form.attr('action'),
+            method: form.attr('method'),
+            data: form.serialize(),
+            success: function(response) {
+                if (response.success) {
+                    // Show success message and reload parent page
+                    if (window.parent) {
+                        window.parent.location.reload();
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    alert('Fehler: ' + (response.error || 'Unbekannter Fehler'));
+                    submitBtn.prop('disabled', false).text(originalText);
+                }
+            },
+            error: function() {
+                alert('Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
+                submitBtn.prop('disabled', false).text(originalText);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -527,4 +527,62 @@ class ShopService
         
         return $addons;
     }
+
+    /**
+     * Add addon(s) to an already existing order (admin action)
+     */
+    public function addAddonToOrder(ShopOrder $order, ShopAddon $addon, int $quantity): void
+    {
+        if ($quantity < 1) {
+            throw new \InvalidArgumentException('Quantity must be >= 1');
+        }
+        // Disallow addon modification on refunded or canceled orders
+        if (in_array($order->getStatus(), [ShopOrderStatus::Refunded, ShopOrderStatus::Canceled])) {
+            throw new OrderLifecycleException($order);
+        }
+        // Enforce limits before persisting
+        $tempOrder = clone $order; // shallow clone, positions retained
+        $this->orderAddAddon($tempOrder, $addon, $quantity);
+        if (!$this->orderAdheresToLimits($tempOrder, $order->getStatus() === ShopOrderStatus::Paid)) {
+            throw new \RuntimeException('Limit verletzt: Addon kann nicht hinzugefügt werden.');
+        }
+        // Append positions
+        $this->orderAddAddon($order, $addon, $quantity);
+        // Persist changes
+        $this->em->persist($order);
+        // Add to history
+        $order->addShopOrderHistory(
+            (new ShopOrderHistory())
+                ->setLoggedAt(new \DateTimeImmutable())
+                ->setAction(ShopOrderHistoryAction::AddonAdded)
+        );
+        $this->em->flush();
+        // If order is paid, fulfill newly added addons constraints if any
+        if ($order->getStatus() === ShopOrderStatus::Paid) {
+            // No ticket creation needed; addons do not trigger fulfillment logic directly
+            $this->logger->info('Addon(s) added to paid order', [
+                'order_id' => $order->getId(),
+                'addon_id' => $addon->getId(),
+                'quantity' => $quantity
+            ]);
+            // Record a transaction if addon has a price > 0
+            $priceEach = $addon->getPrice();
+            if ($priceEach > 0) {
+                try {
+                    $this->transactionService->processAdditionalShopOrderPayment(
+                        $order->getOrderer(),
+                        $priceEach * $quantity,
+                        $order->getId(),
+                        'Addon hinzugefügt: ' . $addon->getName()
+                    );
+                } catch (\Throwable $txe) {
+                    $this->logger->warning('Failed to record transaction for added addon', [
+                        'order_id' => $order->getId(),
+                        'addon_id' => $addon->getId(),
+                        'error' => $txe->getMessage()
+                    ]);
+                }
+            }
+        }
+    }
 }

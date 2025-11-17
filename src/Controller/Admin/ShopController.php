@@ -227,4 +227,41 @@ class ShopController extends AbstractController
 
         return $response;
     }
+
+    #[Route(path: '/order/{id}/add-addon', name: '_add_addon', requirements: ['id' => '\\d+'], methods: ['GET','POST'])]
+    public function addAddon(Request $request, ShopOrder $order): Response
+    {
+        // Only allow AJAX modal popup
+        if (!$request->isXmlHttpRequest()) {
+            throw $this->createNotFoundException();
+        }
+        $form = $this->createForm(\App\Form\AdminShopAddAddonType::class, null, [
+            'action' => $this->generateUrl('admin_shop_add_addon', ['id' => $order->getId()]),
+            'method' => 'POST',
+        ]);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            try {
+                $this->shopService->addAddonToOrder($order, $form->get('addon')->getData(), $form->get('quantity')->getData());
+                $this->addFlash('success', 'Addon wurde hinzugefügt.');
+                return $this->json(['success' => true]);
+            } catch (\Throwable $e) {
+                $this->addFlash('error', 'Addon konnte nicht hinzugefügt werden: ' . $e->getMessage());
+                // log failure history
+                $order->addShopOrderHistory(
+                    (new \App\Entity\ShopOrderHistory())
+                        ->setLoggedAt(new \DateTimeImmutable())
+                        ->setAction(\App\Entity\ShopOrderHistoryAction::AddonAddFailed)
+                );
+                $this->getDoctrine()->getManager()->flush();
+                return $this->json(['success' => false, 'error' => $e->getMessage()], 400);
+            }
+        }
+
+        return $this->render('admin/shop/add_addon.modal.html.twig', [
+            'order' => $order,
+            'form' => $form->createView(),
+        ]);
+    }
 }

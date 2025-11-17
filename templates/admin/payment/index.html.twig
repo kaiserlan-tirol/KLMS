@@ -118,6 +118,9 @@
                                 <a class="btn btn-sm btn-outline-dark text-nowrap" data-toggle="ajaxModal" href="{{ path('admin_payment_show', {'id' : ticket.id}) }}">
                                     <i class="fas fa-ticket"></i> Details
                                 </a>
+                                <a class="btn btn-sm btn-outline-dark text-nowrap" href="{{ path('admin_catering_financial', {'userId': user.uuid}) }}">
+                                    <i class="fas fa-euro"></i> Guthaben
+                                </a>
                             </td>
                         </tr>
                     {% endfor %}

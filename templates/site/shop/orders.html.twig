@@ -27,18 +27,54 @@
                                 <div>
                                     {% include 'site/shop/_order.html.twig' with { order: o} %}
                                 </div>
-                                <div>
-                                    Bitte bezahle <b>{{ (o.calculateTotal() / 100) | format_currency('EUR') }}</b>
-                                    unter der Angabe <b>Bestellnummer {{ o.id }}</b>
-                                    {% if settings.get('lan.signup.payment_details') %}
-                                        an:
-                                        <div class="border p-2 m-1">
-                                            {{ settings.get('lan.signup.payment_details') | raw }}
+                                <div class="mb-3">
+                                    <p class="mb-2">
+                                        Bitte bezahle <strong>{{ (o.calculateTotal() / 100) | format_currency('EUR') }}</strong> unter der Angabe
+                                        <strong>Bestellnummer {{ o.id }}</strong> oder deinem <strong>Benutzer-/Gamertag</strong>.
+                                    </p>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <div class="border rounded p-3 h-100 bg-light">
+                                                <h6 class="text-uppercase text-muted mb-2"><i class="fas fa-university"></i> Zahlung per Überweisung</h6>
+                                                <table class="table table-sm mb-2">
+                                                    <tbody>
+                                                        <tr><th class="pl-0">Empfänger</th><td>Markus Edenhauser</td></tr>
+                                                        <tr><th class="pl-0">IBAN</th><td>LT86 3250 0187 3587 6769</td></tr>
+                                                        <tr><th class="pl-0">BIC</th><td>REVOLT21</td></tr>
+                                                        <tr><th class="pl-0">Verwendungszweck</th><td>{{ app.user.user.nickname }}, Bestellung {{ o.id }}<br>
+                                                        {% set orderAmount = (o.calculateTotal() / 100) | number_format(2, '.', '') %}
+                                        <img
+                                            src="data:image/png;base64,{{ qr_code_data_uri('BCD\n001\n1\nSCT\nREVOLT21\nMarkus Edenhauser\nLT863250018735876769\nEUR' ~ orderAmount ~ '\n\n' ~ app.user.user.nickname ~ ', Bestellung ' ~ o.id)|replace({'data:image/png;base64,': ''}) }}"
+                                            alt="SEPA QR für Überweisung"
+                                            style="max-width: 200px;"
+                                            title="Scan mit Banking-App für schnelle Überweisung"
+                                        />
+                                        <div class="small text-muted mt-1">SEPA-QR für {{ (o.calculateTotal()/100) | format_currency('EUR') }}</div></td></tr>
+                                                    </tbody>
+                                                </table>
+                                                
+                                                <small class="text-muted d-block">Neues Vereinskonto bei Revolut. Litauen (LT) ist korrekt.</small>
+                                            </div>
                                         </div>
-                                    {% else %}
-                                        .
-                                    {% endif %}
+                                        <div class="col-md-6 mb-3">
+                                            <div class="border rounded p-3 h-100 bg-light">
+                                                <h6 class="text-uppercase text-muted mb-2"><i class="fab fa-paypal"></i> Zahlung per PayPal</h6>
+                                                <table class="table table-sm mb-2">
+                                                    <tbody>
+                                                        <tr><th class="pl-0">Email</th><td>verein@headshot.at</td></tr>
+                                                        <tr><th class="pl-0">Betrag</th><td>{{ (o.calculateTotal() / 100) | format_currency('EUR') }}</td></tr>
+                                                        <tr><th class="pl-0">Nachricht</th><td>{{ app.user.user.nickname }}, Bestellung {{ o.id }}</td></tr>
+                                                    </tbody>
+                                                </table>
+                                                <a href="https://paypal.me/kaiserlantirol/{{ (o.calculateTotal()/100) }}EUR" target="_blank" class="btn btn-sm btn-primary mb-2" style="background-color:#0070ba;border-color:#0070ba;">
+                                                    <i class="fab fa-paypal"></i> Direkte PayPal Zahlung ({{ (o.calculateTotal()/100) | format_currency('EUR') }})
+                                                </a>
+                                                <small class="text-muted d-block">Bitte "An Freunde senden" aktivieren um Gebühren zu vermeiden.</small>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
+
                                 <div class="d-flex mt-2">
                                     <div class="flex-fill"></div>
                                     <form id="cancel-order-{{ o.id }}" method="post" action="{{ path('shop_orders') }}">
