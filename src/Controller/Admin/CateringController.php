@@ -12,6 +12,10 @@ use App\Idm\IdmManager;
 use App\Idm\IdmRepository;
 use App\Repository\CateringOrderRepository;
 use App\Service\CateringService;
+use App\Service\TransactionService;
+use App\Service\EmailService;
+use App\Service\CachedQrCodeService;
+use App\Service\SettingService;
 use Ramsey\Uuid\Uuid;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,6 +30,10 @@ use Psr\Log\LoggerInterface;
 #[Route(path: '/catering', name: 'catering')]
 class CateringController extends AbstractController {
     private readonly CateringService $cateringService;
+    private readonly TransactionService $transactionService;
+    private readonly EmailService $emailService;
+    private readonly SettingService $settingService;
+    private readonly CachedQrCodeService $cachedQrCodeService;
     private readonly CateringOrderRepository $orderRepository;
     private readonly SerializerInterface $serializer;
     private readonly IdmRepository $userRepo;
@@ -35,19 +43,27 @@ class CateringController extends AbstractController {
     private const CSRF_TOKEN_PAYED = 'cateringToken';
 
     public function __construct(
-        CateringService $cateringService, 
-        CateringOrderRepository $orderRepository, 
-        SerializerInterface $serializer, 
+        CateringService $cateringService,
+        TransactionService $transactionService,
+        CateringOrderRepository $orderRepository,
+        SerializerInterface $serializer,
         IdmManager $idmManager,
         EntityManagerInterface $em,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        EmailService $emailService,
+        SettingService $settingService,
+        CachedQrCodeService $cachedQrCodeService
     ) {
         $this->cateringService = $cateringService;
+        $this->transactionService = $transactionService;
         $this->orderRepository = $orderRepository;
         $this->serializer = $serializer;
         $this->userRepo = $idmManager->getRepository(User::class);
         $this->em = $em;
         $this->logger = $logger;
+        $this->emailService = $emailService;
+        $this->settingService = $settingService;
+        $this->cachedQrCodeService = $cachedQrCodeService;
     }
 
     #[Route(path: '', name: '', methods: ['GET'])]
@@ -766,6 +782,76 @@ class CateringController extends AbstractController {
             'current_credit' => $currentCredit,
             'transactions' => $transactions,
             'csrf_token' => self::CSRF_TOKEN_PAYED
+        ]);
+    }
+
+    #[Route(path: '/financial/{userId}/reminder', name:'_financial_reminder', methods: ['POST'])]
+    public function sendNegativeBalanceReminder(Request $request, string $userId): Response
+    {
+        $user = $this->userRepo->findOneById(Uuid::fromString($userId));
+        if (!$user) {
+            $this->addFlash('error', 'Benutzer nicht gefunden.');
+            return $this->redirectToRoute('admin_catering_credit_management');
+        }
+        $token = $request->request->get('_token');
+        if (!$this->isCsrfTokenValid(self::CSRF_TOKEN_PAYED, $token)) {
+            throw $this->createAccessDeniedException('Invalid CSRF token presented');
+        }
+        $currentCredit = $this->cateringService->getUserCredit($user);
+        if ($currentCredit >= 0) {
+            $this->addFlash('info', 'Kein negativer Cateringbetrag – keine Erinnerung gesendet.');
+            return $this->redirectToRoute('admin_catering_financial', ['userId' => $userId]);
+        }
+        $outstanding = abs($currentCredit);
+        $qrUrl = $this->cachedQrCodeService->getSepaCateringQrUrl($outstanding);
+        try {
+            $ok = $this->emailService->scheduleHook(EmailService::APP_HOOK_CATERING_NEGATIVE, \App\Helper\EmailRecipient::fromUser($user), [
+                'user' => [
+                    'firstname' => $user->getFirstname(),
+                    'nickname' => $user->getNickname(),
+                ],
+                'balance' => $currentCredit,
+                'qr_url' => $qrUrl,
+            ]);
+            if ($ok) {
+                $this->addFlash('success', 'Erinnerungs-E-Mail wurde eingeplant.');
+            } else {
+                $this->addFlash('error', 'E-Mail konnte nicht eingeplant werden.');
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed scheduling negative balance reminder', [
+                'uuid' => $user->getUuid()?->toString(),
+                'error' => $e->getMessage()
+            ]);
+            $this->addFlash('error', 'Fehler beim Einplanen der Erinnerung: '.$e->getMessage());
+        }
+        return $this->redirectToRoute('admin_catering_financial', ['userId' => $userId]);
+    }
+
+    #[Route(path: '/financial/{userId}/reminder/preview', name:'_financial_reminder_preview', methods: ['GET'])]
+    public function previewNegativeBalanceReminder(string $userId, Request $request): Response
+    {
+        $user = $this->userRepo->findOneById(Uuid::fromString($userId));
+        if (!$user) {
+            throw $this->createNotFoundException('Benutzer nicht gefunden.');
+        }
+        $currentCredit = $this->cateringService->getUserCredit($user);
+        $override = $request->query->get('balance');
+        if ($override !== null && is_numeric($override)) {
+            $currentCredit = (int)$override; // expects cents
+        }
+        $outstanding = abs($currentCredit);
+        $qrUrl = $this->cachedQrCodeService->getSepaCateringQrUrl($outstanding);
+        // Render template directly with same context structure used by hook
+        return $this->render('email/hooks/catering_negative_balance.html.twig', [
+            'user' => [
+                'firstname' => $user->getFirstname(),
+                'nickname' => $user->getNickname(),
+            ],
+            'balance' => $currentCredit,
+            'subject' => 'Preview: Offener Cateringbetrag',
+            'org' => $this->settingService->get('site.organisation') ?? 'KaiserLAN',
+            'qr_url' => $qrUrl,
         ]);
     }
 

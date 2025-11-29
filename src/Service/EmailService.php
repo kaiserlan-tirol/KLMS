@@ -26,6 +26,7 @@ class EmailService
     final public const APP_HOOK_RESET_PW = 'PASSWORD_RESET';
     final public const APP_HOOK_CHANGE_NOTIFICATION = 'CHANGE_NOTIFICATION';
     final public const APP_HOOK_ORDER = 'ORDER';
+    final public const APP_HOOK_CATERING_NEGATIVE = 'CATERING_NEGATIVE_BALANCE';
 
     final public const HOOK_TEMPLATE = 'template';
     final public const HOOK_SUBJECT = 'subject';
@@ -56,7 +57,13 @@ class EmailService
             self::HOOK_SUBJECT_DEFAULT => 'LAN-Shop',
             self::HOOK_TEMPLATE => '/email/hooks/shop.html.twig',
             self::HOOK_CONTEXT => ['order', 'showPaymentInfo', 'showPaymentSuccess'],
-        ]
+        ],
+        self::APP_HOOK_CATERING_NEGATIVE => [
+            self::HOOK_SUBJECT => 'email.catering.negative.subject',
+            self::HOOK_SUBJECT_DEFAULT => 'Offener Cateringbetrag',
+            self::HOOK_TEMPLATE => '/email/hooks/catering_negative_balance.html.twig',
+            self::HOOK_CONTEXT => ['user', 'balance'],
+        ],
     ];
 
     final public const DESIGN_STANDARD = 'Standard';

@@ -1,0 +1,45 @@
+{% extends 'email/design/standard.html.twig' %}
+
+{% block main %}
+{% set org = settings.get('site.organisation') | default('KaiserLAN') %}
+<h1 style="font-size: 36px; margin-bottom: 30px;">Catering Rückstand</h1>
+<p>Hallo {% if user.firstname %}{{ user.firstname }}{% else %}{{ user.nickname }}{% endif %},</p>
+{% set outstanding = (balance * -1) %}
+{% if balance < 0 %}
+    <p>Wir glauben, da ist was unter den Tisch gefallen, das ist nicht so schlimm.</p>
+    <p>Dein aktuelles Catering Guthaben ist <strong>{{ (balance / 100) | format_currency('EUR') }}</strong>.</p>
+    <p>Solltest du bereits bezahlt haben, sende uns bitte eine kurze E-Mail wie und wann, auch bei uns kann hier und da mal was untergehen.</p>
+    <p>Bitte gleiche dein Catering Guthaben zeitnah aus. Du kannst per Paypal oder Banküberweisung bezahlen. Nutze dabei am besten deinen Gamertag als Verwendungszweck.</p>
+    <div class="my-2">
+        <table style="width:100%; border-collapse: collapse;">
+            <tr>
+                <td style="padding:4px; vertical-align: top; width:50%;">
+                    <h3 style="margin:4px 0;">Paypal (an Freunde)</h3>
+                    <p style="margin:2px 0;">Jetzt bezahlen:<br>
+                        <a href="https://paypal.me/kaiserlantirol/{{ (outstanding / 100) }}EUR" target="_blank" rel="noopener">paypal.me/kaiserlantirol/{{ (outstanding / 100) }}EUR</a>
+                    </p>
+                    <p style="margin:2px 0;">Oder an verein@kaiserlan.at</p>
+                </td>
+                <td style="padding:4px; vertical-align: top; width:50%;">
+                    <h3 style="margin:4px 0;">Überweisung</h3>
+                    <p style="margin:2px 0;">Empfänger: Markus Edenhauser<br>Neues Vereinskonto bei Revolut (LT ist korrekt)<br>IBAN: LT86 3250 0187 3587 6769<br>BIC: REVOLT21<br>Verwendungszweck: Dein Benutzer-/Gamertag</p>
+                        <p style="margin:10px 0 2px 0;">Banking QR-Code:<br>
+                            {% if qr_url is defined and qr_url %}
+                                <img src="{{ qr_url }}" alt="QR-Code für Überweisung" title="Scan mit Banking-App für einfache Überweisung" style="max-width:280px; height:auto;" />
+                            {% else %}
+                                {% set sepa_payload = 'BCD\n001\n1\nSCT\nREVOLT21\nMarkus Edenhauser\nLT863250018735876769\nEUR' ~ (outstanding / 100) ~ '\n\nCatering Guthaben Ausgleich' %}
+                                <img src="{{ qr_code_url(sepa_payload) }}" alt="QR-Code für Überweisung" title="Scan mit Banking-App für einfache Überweisung" style="max-width:280px; height:auto;" />
+                            {% endif %}
+                            <br><small style="color:#666;">Falls Bild nicht angezeigt wird: Betrag {{ (outstanding/100)|format_currency('EUR') }} per SEPA an IBAN oben senden.</small>
+                        </p>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <p>Nach Zahlung buchen wir es manuell ein, die Aktualisierung deines Catering Guthaben dauert also etwas.</p>
+{% else %}
+    <p>Aktuell kein negativer Catering Betrag. Diese Mail ist rein informativ.</p>
+{% endif %}
+<p>Deinen aktuellen Stand kannst du jederzeit hier einsehen: <a href="{{ url('catering_credit') }}">Catering Guthaben</a></p>
+{% include 'email/components/greetings.html.twig' %}
+{% endblock %}

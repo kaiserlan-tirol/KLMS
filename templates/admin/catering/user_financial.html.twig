@@ -10,6 +10,14 @@
           <a href="{{ path('admin_catering_credit_management') }}" class="btn btn-secondary mb-3">
             <i class="fas fa-arrow-left"></i> Guthabenverwaltung
           </a>
+                    {% if current_credit < 0 %}
+                    <form action="{{ path('admin_catering_financial_reminder', {'userId': user.uuid}) }}" method="post" style="display:inline-block;" onsubmit="return confirm('Erinnerungs-E-Mail wirklich senden?');">
+                        <input type="hidden" name="_token" value="{{ csrf_token(csrf_token) }}">
+                        <button type="submit" class="btn btn-warning mb-3">
+                            <i class="fas fa-envelope"></i> Erinnerung senden
+                        </button>
+                    </form>
+                    {% endif %}
         </div>
     </div>
 

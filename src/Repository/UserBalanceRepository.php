@@ -64,6 +64,18 @@ class UserBalanceRepository extends ServiceEntityRepository
     }
 
     /**
+     * Get users with negative catering balance (debt specific to catering category)
+     */
+    public function findUsersWithNegativeCateringBalance(): array
+    {
+        return $this->createQueryBuilder('b')
+            ->andWhere('b.cateringBalance < 0')
+            ->orderBy('b.cateringBalance', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Get total platform balance statistics
      */
     public function getPlatformBalanceStats(): array
