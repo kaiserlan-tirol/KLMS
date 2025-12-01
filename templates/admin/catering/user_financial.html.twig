@@ -53,11 +53,26 @@
                                 </div>
                     <input type="number" id="amount" name="amount" class="form-control" step="0.01" 
                         value="0.00" min="0.01" required>
+                                {% if current_credit < 0 %}
+                                <div class="input-group-append">
+                                    <button type="button" class="btn btn-outline-secondary" id="set-open-amount" title="Offenen Betrag einsetzen">
+                                        {{ ((current_credit * -1) / 100) | number_format(2, '.', '') }}
+                                    </button>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                         
                         <div class="form-group">
                             <label for="note">Notiz:</label>
+                            <div class="mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary set-note-btn" data-value="PayPal">
+                                    PayPal
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-primary set-note-btn" data-value="Revolut">
+                                    Revolut
+                                </button>
+                            </div>
                             <textarea id="note" name="note" class="form-control" rows="2" 
                                       placeholder="Optionale Notiz zur Transaktion..."></textarea>
                         </div>
@@ -148,18 +163,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const transactionType = document.getElementById('transaction_type');
     const submitText = document.getElementById('submit_text');
     const amountField = document.getElementById('amount');
-    const autoApplyOption = document.querySelector('.payment-option');
+    const noteField = document.getElementById('note');
     
     function updateFormForType() {
         switch(transactionType.value) {
             case 'payment':
                 submitText.textContent = 'Zahlung verarbeiten';
-                autoApplyOption.style.display = 'block';
                 amountField.min = '0.01';
                 break;
             case 'credit_deduct':
                 submitText.textContent = 'Guthaben reduzieren';
-                autoApplyOption.style.display = 'none';
                 amountField.min = '0.01';
                 break;
         }
@@ -167,6 +180,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     transactionType.addEventListener('change', updateFormForType);
     updateFormForType(); // Initialize on load
+    
+    // Set open amount button
+    const setOpenAmountBtn = document.getElementById('set-open-amount');
+    if (setOpenAmountBtn) {
+        setOpenAmountBtn.addEventListener('click', function() {
+            amountField.value = this.textContent.trim();
+        });
+    }
+    
+    // Set note buttons
+    document.querySelectorAll('.set-note-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            noteField.value = this.dataset.value;
+        });
+    });
 });
 </script>
 {% endblock %}
