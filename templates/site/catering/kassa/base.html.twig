@@ -101,12 +101,18 @@
             }
             
             .btn-kassa-danger {
-                background: linear-gradient(45deg, #dc3545, #c82333);
-                box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+                background: transparent;
+                border: 3px solid #dc3545;
+                color: #dc3545;
+                box-shadow: none;
+                font-size: 1.4rem;
+                padding: 10px 13px;
             }
             
             .btn-kassa-danger:hover {
-                box-shadow: 0 8px 25px rgba(220, 53, 69, 0.4);
+                background: #dc3545;
+                color: white;
+                box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
             }
             
             .kassa-navigation {
@@ -160,12 +166,14 @@
 </head>
 <body>
     <div class="kassa-container">
+        {% block header %}
         <div class="kassa-header">
             <h1>
                 <i class="fas fa-utensils"></i>
                 KaiserLAN Kassa
             </h1>
         </div>
+        {% endblock %}
         
         <div class="kassa-content">
             {% for flash_error in app.flashes('error') %}

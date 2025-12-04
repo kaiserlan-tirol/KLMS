@@ -68,7 +68,7 @@
                     {% for ticket in tickets %}
                         <tr>
                             <td class="text-nowrap text-monospace text-right">{{ ticket.id }}</td>
-                            <td class="text-nowrap text-monospace">{{ ticket.code }} {% if ticket.cateringQrCode %}(QR: {{ ticket.cateringQrCode }}){% endif %}</td>
+                            <td class="text-nowrap text-monospace" title="{{ ticket.code }}">{{ ticket.code[:5] }} {% if ticket.cateringQrCode %}(QR: {{ ticket.cateringQrCode }}){% endif %}</td>
                             <td>{% if ticket.shopOrderPosition %} <span class="badge badge-secondary" title="Gekauft"><i class="fas fa-euro-sign"></i></span>{% endif %}</td>
                             <td data-order="{{ ticket.createdAt | date('U') }}">{{ ticket.createdAt | date(dateformat) }}</td>
                         {% if ticket.redeemed %}
@@ -118,9 +118,11 @@
                                 <a class="btn btn-sm btn-outline-dark text-nowrap" data-toggle="ajaxModal" href="{{ path('admin_payment_show', {'id' : ticket.id}) }}">
                                     <i class="fas fa-ticket"></i> Details
                                 </a>
-                                <a class="btn btn-sm btn-outline-dark text-nowrap" href="{{ path('admin_catering_financial', {'userId': user.uuid}) }}">
-                                    <i class="fas fa-euro"></i> Guthaben
-                                </a>
+                                {% if ticket.isRedeemed and ticket.redeemer %}
+                                    <a class="btn btn-sm btn-outline-dark text-nowrap" href="{{ path('admin_catering_financial', {'userId': ticket.redeemer}) }}">
+                                        <i class="fas fa-euro"></i> Guthaben
+                                    </a>
+                                {% endif %}
                             </td>
                         </tr>
                     {% endfor %}

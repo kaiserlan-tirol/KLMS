@@ -44,9 +44,13 @@ class CateringKassaController extends AbstractController
         $this->settings = $settings;
     }
 
-    #[Route('/', name: 'index')]
-    public function index(): Response
+    #[Route('/', name: 'index', methods: ['GET', 'POST'])]
+    public function index(Request $request): Response
     {
+        if ($request->isMethod('POST')) {
+            return $this->handleQrCodeInput($request);
+        }
+        
         return $this->render('site/catering/kassa/index.html.twig');
     }
 
@@ -54,76 +58,81 @@ class CateringKassaController extends AbstractController
     public function scan(Request $request): Response
     {
         if ($request->isMethod('POST')) {
-            $qrCode = $request->request->get('qr_code');
-            
-            if (!$qrCode) {
-                $this->addFlash('error', 'Kein QR-Code eingegeben.');
-                return $this->redirectToRoute('catering_kassa_scan');
-            }
-
-            // Use the same logic as the QR lookup endpoint
-            try {
-                $user = null;
-                
-                // Try direct UUID first
-                try {
-                    $userId = Uuid::fromString($qrCode);
-                    $userRepo = $this->idmManager->getRepository(User::class);
-                    $user = $userRepo->findOneById($userId);
-                } catch (\Exception $e) {
-                    // Try other formats
-                }
-                
-                // Try UUID from URL
-                if (!$user && preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i', $qrCode, $matches)) {
-                    try {
-                        $userId = Uuid::fromString($matches[0]);
-                        $userRepo = $this->idmManager->getRepository(User::class);
-                        $user = $userRepo->findOneById($userId);
-                    } catch (\Exception $e) {
-                        // Continue
-                    }
-                }
-                
-                // Try to find by 4-character catering QR code
-                if (!$user && strlen(trim($qrCode)) === 4) {
-                    // Normalize QR code to uppercase
-                    $normalizedQrCode = strtoupper(trim($qrCode));
-                    
-                    // Search for ticket by catering QR code
-                    $ticket = $this->ticketRepository->findOneBy(['cateringQrCode' => $normalizedQrCode]);
-                    
-                    if ($ticket && $ticket->getRedeemer()) {
-                        $userRepo = $this->idmManager->getRepository(User::class);
-                        $user = $userRepo->findOneById($ticket->getRedeemer());
-                    }
-                }
-                
-                // Try fuzzy search by nickname
-                if (!$user && strlen($qrCode) >= 3) {
-                    $userRepo = $this->idmManager->getRepository(User::class);
-                    $users = $userRepo->findFuzzy($qrCode);
-                    if (count($users) === 1) {
-                        $user = $users[0];
-                    } elseif (count($users) > 1) {
-                        $this->addFlash('error', 'Mehrere Benutzer gefunden. Bitte genauer eingeben.');
-                        return $this->redirectToRoute('catering_kassa_scan');
-                    }
-                }
-                
-                if (!$user) {
-                    $this->addFlash('error', 'Benutzer nicht gefunden.');
-                    return $this->redirectToRoute('catering_kassa_scan');
-                }
-
-                return $this->redirectToRoute('catering_kassa_products', ['userId' => $user->getUuid()]);
-            } catch (\Exception $e) {
-                $this->addFlash('error', 'Ungültiger QR-Code oder Eingabe.');
-                return $this->redirectToRoute('catering_kassa_scan');
-            }
+            return $this->handleQrCodeInput($request);
         }
 
         return $this->render('site/catering/kassa/scan.html.twig');
+    }
+    
+    private function handleQrCodeInput(Request $request): Response
+    {
+        $qrCode = $request->request->get('qr_code');
+        
+        if (!$qrCode) {
+            $this->addFlash('error', 'Kein QR-Code eingegeben.');
+            return $this->redirectToRoute('catering_kassa_index');
+        }
+
+        // Use the same logic as the QR lookup endpoint
+        try {
+            $user = null;
+            
+            // Try direct UUID first
+            try {
+                $userId = Uuid::fromString($qrCode);
+                $userRepo = $this->idmManager->getRepository(User::class);
+                $user = $userRepo->findOneById($userId);
+            } catch (\Exception $e) {
+                // Try other formats
+            }
+            
+            // Try UUID from URL
+            if (!$user && preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i', $qrCode, $matches)) {
+                try {
+                    $userId = Uuid::fromString($matches[0]);
+                    $userRepo = $this->idmManager->getRepository(User::class);
+                    $user = $userRepo->findOneById($userId);
+                } catch (\Exception $e) {
+                    // Continue
+                }
+            }
+            
+            // Try to find by 4-character catering QR code
+            if (!$user && strlen(trim($qrCode)) === 4) {
+                // Normalize QR code to uppercase
+                $normalizedQrCode = strtoupper(trim($qrCode));
+                
+                // Search for ticket by catering QR code
+                $ticket = $this->ticketRepository->findOneBy(['cateringQrCode' => $normalizedQrCode]);
+                
+                if ($ticket && $ticket->getRedeemer()) {
+                    $userRepo = $this->idmManager->getRepository(User::class);
+                    $user = $userRepo->findOneById($ticket->getRedeemer());
+                }
+            }
+            
+            // Try fuzzy search by nickname
+            if (!$user && strlen($qrCode) >= 3) {
+                $userRepo = $this->idmManager->getRepository(User::class);
+                $users = $userRepo->findFuzzy($qrCode);
+                if (count($users) === 1) {
+                    $user = $users[0];
+                } elseif (count($users) > 1) {
+                    $this->addFlash('error', 'Mehrere Benutzer gefunden. Bitte genauer eingeben.');
+                    return $this->redirectToRoute('catering_kassa_index');
+                }
+            }
+            
+            if (!$user) {
+                $this->addFlash('error', 'Benutzer nicht gefunden.');
+                return $this->redirectToRoute('catering_kassa_index');
+            }
+
+            return $this->redirectToRoute('catering_kassa_products', ['userId' => $user->getUuid()]);
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Ungültiger QR-Code oder Eingabe.');
+            return $this->redirectToRoute('catering_kassa_index');
+        }
     }
 
     #[Route('/products/{userId}', name: 'products')]

@@ -75,7 +75,14 @@ class CheckinController extends AbstractController
     {
         $form = $this->createFormBuilder()
             ->setAction($this->generateUrl('admin_checkin_update', ['id' => $ticket->getId()]));
-                $form->add('punch', SubmitType::class);
+        $form->add('cateringQrCode', TextType::class, [
+            'required' => false,
+            'label' => 'Catering QR-Code',
+            'attr' => [
+                'placeholder' => 'Optional: QR-Code scannen'
+            ]
+        ]);
+        $form->add('punch', SubmitType::class);
 
         return $form->getForm();
     }
@@ -120,6 +127,17 @@ class CheckinController extends AbstractController
                 switch (true) {
                     case self::clickedIfExists($form, 'punch'):
                         $this->ticketService->punchTicket($ticket);
+                        
+                        // Handle catering QR code if provided
+                        $cateringQrCode = $form->get('cateringQrCode')->getData();
+                        if (!empty($cateringQrCode) && Uuid::isValid($cateringQrCode)) {
+                            try {
+                                $this->klcsConnectorService->createAccount($user, Uuid::fromString($cateringQrCode));
+                                $this->addFlash('success', "Catering-Account erfolgreich verbunden!");
+                            } catch (\Exception $e) {
+                                $this->addFlash('warning', "Catering-Account konnte nicht verbunden werden: " . $e->getMessage());
+                            }
+                        }
                         break;
                     default:
                         $this->addFlash('error', "Aktion konnte nicht durchgeführt werden");

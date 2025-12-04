@@ -361,6 +361,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function resetButton() {
         submitBtn.disabled = qrInput.value.trim().length !== 4;
         submitBtn.innerHTML = '<i class="fas fa-arrow-right" style="margin-right: 10px;"></i>Weiter';
+        qrInput.disabled = false;
+        qrInput.value = '';
+        qrInput.focus();
     }
     
     // Handle button click

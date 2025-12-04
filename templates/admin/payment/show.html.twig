@@ -20,12 +20,9 @@
                     </p>
                     <p>
                         <i class="fas fa-euro fa-fw mr-2" title="Käufer"></i>
-                        {% if ticket.shopOrderPosition is not empty %}
-                            <span class="d-inline-block" title="Bestellnummer">&numero; {{ ticket.shopOrderPosition.order.id }}</span>&nbsp;|&nbsp;<span class="d-inline-block">{{ ticket.shopOrderPosition.order.orderer | username }}</span>
-                        {% else %}
-                            <span class="d-inline-block text-muted">nicht gekauft</span>
-                        {% endif %}
+                        <span class="d-inline-block text-muted">Bestellinfo nicht verfügbar</span>
                     </p>
+                    {# TODO: Fix broken shopOrderPosition relationship - entity ID 2 missing #}
                     <p>
                         <i class="fas fa-shopping-cart fa-fw mr-2" title="Gekauft"></i>
                         <span class="d-inline-block">{{ ticket.createdAt | date(dateformat) }}</span>

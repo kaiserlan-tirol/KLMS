@@ -1,6 +1,7 @@
 {% extends 'site/catering/kassa/base.html.twig' %}
 
 {% block title %}Produkte wählen - KaiserLAN Kassa{% endblock %}
+{% block header %}{% endblock %}
 
 {% block content %}
 <div id="products-page">
@@ -109,11 +110,11 @@
         <div class="kassa-navigation" style="margin-top: 0;">
             <a href="{{ path('catering_kassa_index') }}" class="btn-kassa btn-kassa-danger">
                 <i class="fas fa-times"></i>
-                Abbrechen
+                Abmelden
             </a>
             <a href="{{ path('catering_kassa_payment', {userId: user.uuid}) }}" class="btn-kassa btn-kassa-secondary">
                 <i class="fas fa-wallet"></i>
-                Kontostand
+                Transaktionen
             </a>
         </div>
     </div>

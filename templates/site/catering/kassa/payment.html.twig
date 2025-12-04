@@ -5,14 +5,15 @@
 {% block content %}
 <div class="text-center">
     <!-- User info header -->
-    <div style="background: linear-gradient(135deg, rgb(0, 123, 230) 0%,#4dacff 100%); color: white; padding: 30px; border-radius: 15px; margin-bottom: 30px;">
-        <h3 style="margin: 0 0 15px 0; font-size: 2rem;">
-            <i class="fas fa-user-circle" style="margin-right: 10px;"></i>
-            {{ user.nickname }}
-        </h3>
-        <p style="margin: 0 0 10px 0; font-size: 1.1rem; opacity: 0.9;">{{ user.email }}</p>
-        <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 10px; margin-top: 20px;">
-            <h2 style="margin: 0; font-size: 3rem; font-weight: 700;">
+    <div style="display: flex; background: linear-gradient(135deg, rgb(0, 123, 230) 0%,#4dacff 100%); color: white; padding: 10px; border-radius: 15px; margin-bottom: 30px;">
+        <div style="flex: 1; width: 50%; padding-top: 10px;">
+            <h3 style="margin: 0 0 15px 0; font-size: 2rem;">
+                <i class="fas fa-user-circle" style="margin-bottom: 10px;"></i><br />
+                {{ user.nickname }}
+            </h3>
+        </div>
+        <div style="flex: 1; width: 50%; padding: 20px; border-radius: 10px; ">
+            <h2 style="margin: 0; font-size: 2.2rem; font-weight: 700;">
                 {{ (current_credit/100) | format_currency('EUR') }}
             </h2>
             <p style="margin: 5px 0 0 0; font-size: 1.2rem; opacity: 0.9;">
@@ -22,41 +23,11 @@
     </div>
 
     <!-- Payment Info -->
-    <div style="background: white; padding: 30px; border-radius: 15px; margin-bottom: 30px; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-        <h4 style="color: #333; font-size: 1.6rem; margin-bottom: 25px; text-align: center;">
-            <i class="fas fa-info-circle" style="color: #17a2b8; margin-right: 10px;"></i>
-            Guthaben aufladen
-        </h4>
-        
-        <div style="display: grid; gap: 20px;">
-            <div style="padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #0070ba;">
-                <h6 style="color: #333; font-size: 1.2rem; margin-bottom: 10px;">
-                    <i class="fab fa-paypal" style="color: #0070ba; margin-right: 8px;"></i>
-                    PayPal
-                </h6>
-                <p style="color: #666; margin: 0 0 15px 0;">
-                    Lade dein Guthaben direkt mit PayPal auf:
-                </p>
-                <a href="https://paypal.me/kaiserlantirol" target="_blank" 
-                   style="display: inline-block; background: #0070ba; color: white; padding: 12px 20px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-                    <i class="fab fa-paypal" style="margin-right: 8px;"></i>
-                    Jetzt aufladen
-                </a>
-                <p style="color: #999; font-size: 0.9rem; margin-top: 10px;">
-                    <strong>Wichtig:</strong> Verwende als Nachricht: "{{ user.nickname }}, Catering"
-                </p>
-            </div>
-            
-            <div style="padding: 20px; background: #fff3cd; border-radius: 10px; border-left: 4px solid #ffc107;">
-                <h6 style="color: #333; font-size: 1.2rem; margin-bottom: 10px;">
-                    <i class="fas fa-hand-holding-usd" style="color: #ffc107; margin-right: 8px;"></i>
-                    Bar vor Ort
-                </h6>
-                <p style="color: #666; margin: 0;">
-                    Frage einen Admin vor Ort, um dein Guthaben bar aufzuladen.
-                </p>
-            </div>
-        </div>
+    <div style="background: white; padding: 20px; border-radius: 15px; margin-bottom: 30px; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+        <p style="color: #666; margin: 0;">
+            Deiner offenen Posten kannst du auf kaiserlan.at<br>
+            im Profil &gt; Catering Dashboard direkt bezahlen.
+        </p>
     </div>
 
     <!-- Transaction History -->
@@ -104,11 +75,11 @@
     <div class="kassa-navigation">
         <a href="{{ path('catering_kassa_index') }}" class="btn-kassa btn-kassa-danger">
             <i class="fas fa-times"></i>
-            Abbrechen
+            Abmelden
         </a>
         <a href="{{ path('catering_kassa_products', {userId: user.uuid}) }}" class="btn-kassa">
             <i class="fas fa-arrow-left"></i>
-            Zurück zu Produkten
+            Zurück zur Kassa
         </a>
     </div>
 </div>

@@ -1,3 +1,4 @@
+import '../css/app.scss';
 import $ from "jquery";
 
 import './modules/adminDataTable/jquery.adminDataTable.js';
