@@ -22,16 +22,10 @@
                         
                         <dt class="col-sm-3">Status:</dt>
                         <dd class="col-sm-9">
-                            {% if order.isOpen %}
-                                <span class="badge badge-warning">Offen</span>
-                            {% elseif order.isPaymentSent %}
-                                <span class="badge badge-info">Zahlung gesendet</span>
-                            {% elseif order.isActive %}
-                                <span class="badge badge-success">Bezahlt</span>
-                            {% elseif order.isCanceled %}
+                            {% if order.isRefunded or order.isCanceled %}
                                 <span class="badge badge-secondary">Storniert</span>
-                            {% elseif order.isRefunded %}
-                                <span class="badge badge-info">Rückerstattet</span>
+                            {% else %}
+                                <span class="badge badge-success">Erledigt</span>
                             {% endif %}
                         </dd>
                         
@@ -85,53 +79,21 @@
         </div>
         
         <div class="col-md-4">
+            {% if order.isActive %}
             <div class="card">
                 <div class="card-header">
                     <h5>Aktionen</h5>
                 </div>
                 <div class="card-body">
-                    {% if order.isOpen %}
-                        <form method="post" action="{{ path('admin_catering_edit', {'id': order.id}) }}">
-                            <input type="hidden" name="_token" value="{{ csrf_token(csrf_token) }}">
-                            <button type="submit" name="action" value="paid" class="btn btn-success btn-block mb-2">
-                                <i class="fas fa-check"></i> Als bezahlt markieren
-                            </button>
-                        </form>
-                        
-                        <form method="post" action="{{ path('admin_catering_edit', {'id': order.id}) }}">
-                            <input type="hidden" name="_token" value="{{ csrf_token(csrf_token) }}">
-                            <button type="submit" name="action" value="cancel" class="btn btn-warning btn-block" onclick="return confirm('Bestellung wirklich stornieren?')">
-                                <i class="fas fa-times"></i> Stornieren
-                            </button>
-                        </form>
-                    {% endif %}
-                    
-                    {% if order.isActive %}
-                        <form method="post" action="{{ path('admin_catering_edit', {'id': order.id}) }}">
-                            <input type="hidden" name="_token" value="{{ csrf_token(csrf_token) }}">
-                            <button type="submit" name="action" value="undo" class="btn btn-warning btn-block mb-2" onclick="return confirm('Bezahlung wirklich rückgängig machen?')">
-                                <i class="fas fa-undo"></i> Rückerstatten
-                            </button>
-                        </form>
-                        
-                        <form method="post" action="{{ path('admin_catering_edit', {'id': order.id}) }}">
-                            <input type="hidden" name="_token" value="{{ csrf_token(csrf_token) }}">
-                            <button type="submit" name="action" value="refund" class="btn btn-info btn-block" onclick="return confirm('Bestellung wirklich stornieren?')">
-                                <i class="fas fa-ban"></i> Stornierung
-                            </button>
-                        </form>
-                    {% endif %}
-                    
-                    {% if order.isDead %}
-                        <form method="post" action="{{ path('admin_catering_edit', {'id': order.id}) }}">
-                            <input type="hidden" name="_token" value="{{ csrf_token(csrf_token) }}">
-                            <button type="submit" name="action" value="delete" class="btn btn-danger btn-block" onclick="return confirm('Bestellung wirklich löschen?')">
-                                <i class="fas fa-trash"></i> Löschen
-                            </button>
-                        </form>
-                    {% endif %}
+                    <form method="post" action="{{ path('admin_catering_edit', {'id': order.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token(csrf_token) }}">
+                        <button type="submit" name="action" value="refund" class="btn btn-warning btn-block mb-2" onclick="return confirm('Bestellung wirklich stornieren und Guthaben zurückerstatten?')">
+                            <i class="fas fa-undo"></i> Stornierung
+                        </button>
+                    </form>
                 </div>
             </div>
+            {% endif %}
             
             {% if order.cateringOrderHistory | length > 0 %}
             <div class="card mt-3">

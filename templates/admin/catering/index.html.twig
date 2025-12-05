@@ -12,9 +12,6 @@
                 <a href="{{ path('admin_catering_product') }}" class="btn btn-sm btn-secondary">
                     <i class="fas fa-utensils"></i> Produkte verwalten
                 </a>
-                <a href="{{ path('admin_catering_payments') }}" class="btn btn-sm btn-info">
-                    <i class="fas fa-money-bill"></i> Zahlungen verwalten
-                </a>
                 <a href="{{ path('admin_catering_credit_management') }}" class="btn btn-sm btn-warning">
                     <i class="fas fa-wallet"></i> Guthaben verwalten
                 </a>
@@ -45,16 +42,10 @@
                             {% set total = order.calculateTotal %}
                             <td class="text-right" data-order="{{ total }}">{{ (total/100) | format_currency('EUR') }}</td>
                             <td>
-                                {% if order.isOpen %}
-                                    <span class="badge badge-info">Offen</span>
-                                {% elseif order.isPaymentSent %}
-                                    <span class="badge badge-warning">Zahlung gesendet</span>
-                                {% elseif order.isActive %}
-                                    <span class="badge badge-primary">Bezahlt</span>
-                                {% elseif order.isCanceled %}
-                                    <span class="badge badge-light-muted">Storniert</span>
-                                {% elseif order.isRefunded %}
-                                    <span class="badge badge-light-muted">Rückerstattet</span>
+                                {% if order.isRefunded or order.isCanceled %}
+                                    <span class="badge badge-secondary">Storniert</span>
+                                {% else %}
+                                    <span class="badge badge-success">Erledigt</span>
                                 {% endif %}
                             </td>
                             <td>

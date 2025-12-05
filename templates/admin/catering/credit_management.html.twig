@@ -33,9 +33,6 @@
                                 Außenstände: {{ (outstanding_total/100) | format_currency('EUR') }}
                             </span>
                         {% endif %}
-                        <a href="{{ path('admin_catering_payments') }}" class="btn btn-info me-2">
-                            <i class="fas fa-money-bill"></i> Zahlungsverwaltung
-                        </a>
                         <button type="button" id="addUserCreditBtn" class="btn btn-success" data-toggle="modal" data-target="#addUserCreditModal">
                             <i class="fas fa-plus-circle"></i> Guthaben für anderen Benutzer hinzufügen
                         </button>

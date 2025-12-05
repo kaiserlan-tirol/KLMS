@@ -91,18 +91,6 @@ class CateringController extends AbstractController {
         $action = $request->request->get('action');
         try {
             switch ($action) {
-                case 'cancel':
-                    $this->cateringService->cancelOrder($order);
-                    break;
-                case 'paid':
-                    $this->cateringService->setOrderPaid($order);
-                    break;
-                case 'undo':
-                    $this->cateringService->setOrderPaidUndo($order);
-                    break;
-                case 'delete':
-                    $this->cateringService->deleteOrder($order);
-                    break;
                 case 'refund':
                     $this->cateringService->refundOrder($order);
                     break;
@@ -466,93 +454,6 @@ class CateringController extends AbstractController {
         }
     }
 
-    #[Route(path: '/payments', name:'_payments', methods: ['GET'])]
-    public function paymentsList(): Response
-    {
-        // Get all users with payment sent orders
-        $paymentSentOrders = $this->orderRepository->findBy([
-            'status' => \App\Entity\CateringOrderStatus::PaymentSent
-        ], ['createdAt' => 'DESC']);
-        
-        // Group orders by user
-        $ordersByUser = [];
-        foreach ($paymentSentOrders as $order) {
-            $userId = $order->getOrderer()->toString();
-            if (!isset($ordersByUser[$userId])) {
-                $user = $this->userRepo->findOneById($order->getOrderer());
-                $ordersByUser[$userId] = [
-                    'user' => $user,
-                    'orders' => [],
-                    'total' => 0
-                ];
-            }
-            $ordersByUser[$userId]['orders'][] = $order;
-            $ordersByUser[$userId]['total'] += $order->calculateTotal();
-        }
-        
-        return $this->render('admin/catering/payments.html.twig', [
-            'users_with_pending_payments' => $ordersByUser,
-        ]);
-    }
-    
-    #[Route(path: '/process-payment/{userId}', name:'_process_payment', methods: ['GET', 'POST'])]
-    public function processPayment(Request $request, string $userId): Response
-    {
-        $user = $this->userRepo->findOneById(Uuid::fromString($userId));
-        
-        if (!$user) {
-            $this->addFlash('error', 'Benutzer nicht gefunden.');
-            return $this->redirectToRoute('admin_catering_payments');
-        }
-        
-        // Legacy concept of offene / Zahlung gesendet Bestellungen removed.
-        // Orders are considered closed on placement and reflected only through transactions & balance.
-        
-        // Get current credit balance
-        $currentCredit = $this->cateringService->getUserCredit($user);
-        
-        if ($request->isMethod('POST')) {
-            $token = $request->request->get('_token');
-            if (!$this->isCsrfTokenValid(self::CSRF_TOKEN_PAYED, $token)) {
-                throw $this->createAccessDeniedException('Invalid CSRF token presented');
-            }
-            
-            $amount = (int)($request->request->get('payment_amount') * 100); // Convert to cents
-            $note = $request->request->get('payment_note');
-            
-            if ($amount <= 0) {
-                $this->addFlash('error', 'Der Zahlungsbetrag muss größer als 0 sein.');
-                return $this->redirectToRoute('admin_catering_process_payment', ['userId' => $userId]);
-            }
-            
-            try {
-                // Process payment
-                $result = $this->cateringService->processPayment($user, $amount, $note);
-                
-                $this->addFlash('success', sprintf(
-                    'Zahlung über %.2f € wurde verarbeitet. %d Bestellung(en) wurden bezahlt und %.2f € wurden dem Guthaben gutgeschrieben.',
-                    $amount / 100,
-                    $result['orders_processed'],
-                    $result['amount_credited'] / 100
-                ));
-                
-                return $this->redirectToRoute('admin_catering_payments');
-            } catch (\Exception $e) {
-                $this->addFlash('error', 'Fehler bei der Verarbeitung der Zahlung: ' . $e->getMessage());
-            }
-        }
-        
-        return $this->render('admin/catering/process_payment.html.twig', [
-            'user' => $user,
-            'payment_sent_orders' => $paymentSentOrders,
-            'open_orders' => $openOrders,
-            'total_payment_sent' => $totalPaymentSent,
-            'total_open_orders' => $totalOpenOrders,
-            'current_credit' => $currentCredit,
-            'csrf_token' => self::CSRF_TOKEN_PAYED
-        ]);
-    }
-    
     #[Route(path: '/credit-management', name:'_credit_management', methods: ['GET'])]
     public function creditManagement(Request $request): Response
     {
@@ -700,30 +601,7 @@ class CateringController extends AbstractController {
         
         if (!$user) {
             $this->addFlash('error', 'Benutzer nicht gefunden.');
-            return $this->redirectToRoute('admin_catering_payments');
-        }
-        
-        // Get user's payment sent orders
-        $paymentSentOrders = $this->orderRepository->findBy([
-            'orderer' => $user->getUuid(),
-            'status' => \App\Entity\CateringOrderStatus::PaymentSent
-        ], ['createdAt' => 'ASC']);
-        
-        // Also get any open orders
-        $openOrders = $this->orderRepository->findBy([
-            'orderer' => $user->getUuid(),
-            'status' => \App\Entity\CateringOrderStatus::Created
-        ], ['createdAt' => 'ASC']);
-        
-        // Calculate totals
-        $totalPaymentSent = 0;
-        foreach ($paymentSentOrders as $order) {
-            $totalPaymentSent += $order->calculateTotal();
-        }
-        
-        $totalOpenOrders = 0;
-        foreach ($openOrders as $order) {
-            $totalOpenOrders += $order->calculateTotal();
+            return $this->redirectToRoute('admin_catering_credit_management');
         }
         
         // Get current credit balance and transaction history
