@@ -4,15 +4,22 @@
 
 {% block main %}
     {% set user = form.vars.data %}
+    {% set image = vich_uploader_asset(form.image.vars.data, "imageFile") %}
     <div class="container">
-        {% embed "site/components/cards/skeletons/cardProfile.html.twig"  with { cardImg: user | user_image, 'cardSymbol': 'fas fas fa-user-circle fa-9x'} %}
-            {% block cardBody %}
-                <h1 class="h3 card-title mb-4">Profil bearbeiten</h1>
-                {{ form_start(form) }}
-                <div class="float-right">
-                    <a class="btn btn-outline-primary" href="{{ path('user_profile_edit_pw') }}"><i class="fas fa-user-edit"></i> Passwort ändern</a>
-                </div>
-                <h2 class="h4 pt-3 border-bottom">Persönliche Informationen</h2>
+        {{ form_start(form) }}
+        <div class="row">
+            <div class="col-md-8 order-md-2">
+                {% embed "site/components/cards/skeletons/cardProfile.html.twig"  with { cardImg: image, 'cardSymbol': 'fas fas fa-user-circle fa-9x'} %}
+                    {% block imageForm %}
+                        {{ form_row(form.image.imageFile) }}
+                    {% endblock %}
+                    {% block cardBody %}
+                        <h1 class="h3 card-title mb-4">Profil bearbeiten</h1>
+                        <div class="float-right">
+                            <a class="btn btn-outline-primary" href="{{ path('user_profile_edit_pw') }}"><i class="fas fa-user-edit"></i> Passwort ändern</a>
+                        </div>
+                        
+                        <h2 class="h4 pt-3 border-bottom">Persönliche Informationen</h2>
                 {{ form_row(form.nickname, {'input_group_prepend' : '<i class="fas fa-headset"></i>'}) }}
                 <div class="row">
                     <div class="col-md-6">
@@ -56,14 +63,16 @@
                 {{ form_row(form.website, {'input_group_prepend' : '<i class="fas fa-globe"></i>'}) }}
                 {{ form_row(form.hardware, {'input_group_prepend' : '<i class="fas fa-desktop"></i>'}) }}
                 
-                <hr>
-                
-                <div class="float-right pb-2 pt-2">
-                    <a class="btn btn-secondary" href="{{ path('user_profile') }}">Abbrechen</a>
-                    <button type="submit" id="user_save" class="btn-primary btn">Speichern</button>
-                </div>
-                {{ form_end(form) }}
-            {% endblock %}
-        {% endembed  %}
+                        <hr>
+                        
+                        <div class="float-right pb-2 pt-2">
+                            <a class="btn btn-secondary" href="{{ path('user_profile') }}">Abbrechen</a>
+                            <button type="submit" id="user_save" class="btn-primary btn">Speichern</button>
+                        </div>
+                    {% endblock %}
+                {% endembed  %}
+            </div>
+        </div>
+        {{ form_end(form) }}
     </div>
 {% endblock %}

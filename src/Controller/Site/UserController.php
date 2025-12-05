@@ -3,16 +3,19 @@
 namespace App\Controller\Site;
 
 use App\Entity\User;
+use App\Entity\UserImage;
 use App\Form\UserType;
 use App\Helper\EmailRecipient;
 use App\Idm\Exception\PersistException;
 use App\Idm\IdmManager;
 use App\Idm\IdmRepository;
+use App\Repository\UserImageRepository;
 use App\Security\LoginUser;
 use App\Service\EmailService;
 use App\Service\SettingService;
 use App\Service\TicketService;
 use App\Service\TicketState;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -30,12 +33,16 @@ class UserController extends AbstractController
     private readonly SettingService $settingService;
     private readonly TicketService $ticketService;
     private readonly LoggerInterface $logger;
+    private readonly UserImageRepository $userImgRepo;
+    private readonly EntityManagerInterface $em;
 
     public function __construct(IdmManager $manager,
                                 EmailService $emailService,
                                 SettingService $settingService,
                                 TicketService $ticketService,
-                                LoggerInterface $logger)
+                                LoggerInterface $logger,
+                                UserImageRepository $userImgRepo,
+                                EntityManagerInterface $em)
     {
         $this->manager = $manager;
         $this->userRepo = $manager->getRepository(User::class);
@@ -43,6 +50,8 @@ class UserController extends AbstractController
         $this->settingService = $settingService;
         $this->ticketService = $ticketService;
         $this->logger = $logger;
+        $this->userImgRepo = $userImgRepo;
+        $this->em = $em;
     }
 
     public function getUser(): User
@@ -177,7 +186,9 @@ class UserController extends AbstractController
     {
         $user = $this->getUser();
 
-        $form = $this->createForm(UserType::class, $user);
+        $image = $this->userImgRepo->findOneByUser($user) ?? new UserImage($user->getUuid());
+        $form = $this->createForm(UserType::class, $user, ['with_image' => true]);
+        $form->get('image')->setData($image);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -187,6 +198,15 @@ class UserController extends AbstractController
                 $this->manager->persist($user);
                 $this->manager->flush();
 
+                $image = $form->get('image')->getData();
+                if ($image->isEmpty()) {
+                    $this->em->remove($image);
+                } else {
+                    $this->em->persist($image);
+                }
+                $this->em->flush();
+
+                $this->addFlash('success', 'Profil erfolgreich aktualisiert!');
                 return $this->redirectToRoute('user_profile');
             } catch (PersistException $e) {
                 match ($e->getCode()) {
