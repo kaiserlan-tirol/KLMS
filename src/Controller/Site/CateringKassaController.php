@@ -2,12 +2,15 @@
 
 namespace App\Controller\Site;
 
+use App\Entity\ShopAddon;
 use App\Entity\Ticket;
 use App\Entity\User;
 use App\Entity\CateringOrder;
 use App\Repository\TicketRepository;
 use App\Service\CateringService;
 use App\Service\SettingService;
+use App\Service\ShopService;
+use App\Service\TicketService;
 use App\Repository\CateringProductRepository;
 use App\Idm\IdmManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,6 +30,8 @@ class CateringKassaController extends AbstractController
     private readonly EntityManagerInterface $entityManager;
     private readonly TicketRepository $ticketRepository;
     private readonly SettingService $settings;
+    private readonly ShopService $shopService;
+    private readonly TicketService $ticketService;
 
     public function __construct(
         CateringService $cateringService,
@@ -34,7 +39,9 @@ class CateringKassaController extends AbstractController
         IdmManager $idmManager,
         EntityManagerInterface $entityManager,
         TicketRepository $ticketRepository,
-        SettingService $settings
+        SettingService $settings,
+        ShopService $shopService,
+        TicketService $ticketService
     ) {
         $this->cateringService = $cateringService;
         $this->productRepository = $productRepository;
@@ -42,6 +49,8 @@ class CateringKassaController extends AbstractController
         $this->entityManager = $entityManager;
         $this->ticketRepository = $ticketRepository;
         $this->settings = $settings;
+        $this->shopService = $shopService;
+        $this->ticketService = $ticketService;
     }
 
     #[Route('/', name: 'index', methods: ['GET', 'POST'])]
@@ -180,24 +189,22 @@ class CateringKassaController extends AbstractController
             $userAddons = $this->cateringService->getUserAddons($user);
             $userHasFlatrate = $this->cateringService->userHasFlatrate($user);
             
-            // Separate products into included (addon) and paid products
-            $addonProducts = [];
-            $paidProducts = [];
-            
-            foreach ($products as $product) {
-                if ($product->isIncludedInAnyAddon($userAddons)) {
-                    $addonProducts[] = $product;
-                } else {
-                    $paidProducts[] = $product;
+            // Get the Foodflat addon
+            $allAddons = $this->shopService->getAddons(false);
+            $foodflatAddon = null;
+            foreach ($allAddons as $addon) {
+                if ($addon->getName() === 'Foodflat') {
+                    $foodflatAddon = $addon;
+                    break;
                 }
             }
             
             return $this->render('site/catering/kassa/products.html.twig', [
                 'user' => $user,
-                'products' => $paidProducts,
-                'addon_products' => $addonProducts,
+                'products' => $products,
                 'user_addons' => $userAddons,
-                'user_has_flatrate' => $userHasFlatrate,
+                'user_has_foodflat' => $userHasFlatrate,
+                'foodflat_addon' => $foodflatAddon,
                 'current_credit' => $currentCredit,
             ]);
         } catch (\Exception $e) {
@@ -229,14 +236,58 @@ class CateringKassaController extends AbstractController
             $currentCredit = $this->cateringService->getUserCredit($user);
             $transactions = $this->cateringService->getUserTransactionHistory($user);
             
+            // Get user's ticket and addons
+            $ticket = $this->ticketService->getTicketUser($user);
+            $userAddons = $ticket ? $this->shopService->getUserAddons($user) : [];
+            $allAddons = $this->shopService->getAddons();
+            
             return $this->render('site/catering/kassa/payment.html.twig', [
                 'user' => $user,
                 'current_credit' => $currentCredit,
                 'transactions' => $transactions,
+                'ticket' => $ticket,
+                'userAddons' => $userAddons,
+                'allAddons' => $allAddons,
             ]);
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ungültiger Benutzer.');
             return $this->redirectToRoute('catering_kassa_index');
+        }
+    }
+
+    #[Route('/book-addon/{userId}/{addonId}', name: 'book_addon', methods: ['POST'])]
+    public function bookAddon(string $userId, int $addonId): Response
+    {
+        try {
+            $userUuid = Uuid::fromString($userId);
+            $userRepo = $this->idmManager->getRepository(User::class);
+            $user = $userRepo->findOneById($userUuid);
+            
+            if (!$user) {
+                return $this->json(['success' => false, 'message' => 'Benutzer nicht gefunden.']);
+            }
+
+            $ticket = $this->ticketService->getTicketUser($user);
+            if (!$ticket) {
+                return $this->json(['success' => false, 'message' => 'Kein Ticket gefunden.']);
+            }
+
+            $addon = $this->entityManager->getRepository(ShopAddon::class)->find($addonId);
+            if (!$addon) {
+                return $this->json(['success' => false, 'message' => 'Addon nicht gefunden.']);
+            }
+
+            $this->shopService->addAddonToTicketWithCateringBalance($ticket, $addon);
+            
+            return $this->json([
+                'success' => true, 
+                'message' => sprintf('"%s" erfolgreich gebucht!', $addon->getName())
+            ]);
+        } catch (\Exception $e) {
+            return $this->json([
+                'success' => false, 
+                'message' => sprintf('Fehler: %s', $e->getMessage())
+            ]);
         }
     }
 

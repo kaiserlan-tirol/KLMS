@@ -76,10 +76,12 @@ class CheckinController extends AbstractController
         $form = $this->createFormBuilder()
             ->setAction($this->generateUrl('admin_checkin_update', ['id' => $ticket->getId()]));
         $form->add('cateringQrCode', TextType::class, [
-            'required' => false,
+            'required' => true,
             'label' => 'Catering QR-Code',
+            'data' => $ticket->getCateringQrCode(), // Pre-fill if already set
             'attr' => [
-                'placeholder' => 'Optional: QR-Code scannen'
+                'placeholder' => 'QR-Code scannen',
+                'autofocus' => true
             ]
         ]);
         $form->add('punch', SubmitType::class);
@@ -100,7 +102,8 @@ class CheckinController extends AbstractController
     #[Route(path: '', name: '', methods: ['GET'])]
     public function index(): Response
     {
-        $tickets = $this->ticketService->queryTickets();
+        // Show REDEEMED tickets (assigned to users but not yet checked in)
+        $tickets = $this->ticketService->queryTickets(\App\Service\TicketState::REDEEMED);
         $uuids = array_map(fn (Ticket $t) => $t->getRedeemer(), $tickets);
         $uuids = array_filter($uuids, fn (?UuidInterface $uuid) => !empty($uuid));
         $users = $this->userService->getUsers($uuids, assoc: true);
@@ -126,10 +129,16 @@ class CheckinController extends AbstractController
             try {
                 switch (true) {
                     case self::clickedIfExists($form, 'punch'):
+                        // Get catering QR code from form and set it on the ticket
+                        $cateringQrCode = $form->get('cateringQrCode')->getData();
+                        if (!empty($cateringQrCode)) {
+                            $ticket->setCateringQrCode($cateringQrCode);
+                        }
+                        
+                        // Now punch the ticket (which validates catering QR code is present)
                         $this->ticketService->punchTicket($ticket);
                         
-                        // Handle catering QR code if provided
-                        $cateringQrCode = $form->get('cateringQrCode')->getData();
+                        // If catering QR code is a valid UUID, also create KLCS account
                         if (!empty($cateringQrCode) && Uuid::isValid($cateringQrCode)) {
                             try {
                                 $this->klcsConnectorService->createAccount($user, Uuid::fromString($cateringQrCode));

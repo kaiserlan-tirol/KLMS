@@ -26,7 +26,7 @@
                     </thead>
                     <tbody>
                     {% for ticket in tickets %}
-                        {% if ticket.redeemed and ticket.redeemer is seated_user %}
+                        {% if ticket.redeemed %}
                             <tr>
                                 <td class="text-nowrap text-monospace text-right">{{ ticket.id }}</td>
                                 {% if ticket.redeemed %}
@@ -50,6 +50,10 @@
                                         {% set user = ticket.redeemer | user %}
                                         {% if user is age_below(18) %}
                                             <span class="badge badge-danger">U18</span>
+                                        {% endif %}
+                                        
+                                        {% if ticket.redeemer is not seated_user %}
+                                            <span class="badge badge-warning">Kein Sitzplatz</span>
                                         {% endif %}
                                     {% else %}
                                         <span class="badge badge-secondary">Offen</span>

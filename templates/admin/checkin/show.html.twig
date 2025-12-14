@@ -117,6 +117,14 @@
                                             <span class="d-inline-block text-muted">nicht eingelöst</span>
                                         {% endif %}
                                     </p>
+                                    <p>
+                                        <i class="fas fa-qrcode fa-fw mr-2" title="Catering QR-Code"></i>
+                                        {% if ticket.cateringQrCode is not empty %}
+                                            <span class="d-inline-block text-monospace badge badge-success">{{ ticket.cateringQrCode }}</span>
+                                        {% else %}
+                                            <span class="d-inline-block text-muted">nicht zugewiesen</span>
+                                        {% endif %}
+                                    </p>
                                 </div>
                             </div>
                         </div>

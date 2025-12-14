@@ -229,10 +229,36 @@ class PaymentController extends AbstractController
         $form = $this->createTicketModificationForm($ticket);
         $user = $this->ticketService->userByTicket($ticket);
 
+        // Get all active addons and ticket's current addons
+        $allAddons = $this->shopService->getAddons();
+        $ticketAddons = $this->shopService->getTicketAddons($ticket);
+
         return $this->render('admin/payment/show.html.twig', [
             'user' => $user,
             'ticket' => $ticket,
             'form' => $form->createView(),
+            'allAddons' => $allAddons,
+            'ticketAddons' => $ticketAddons,
         ]);
+    }
+
+    #[Route(path: '/{id}/addon/{addonId}', name: '_add_addon', methods: ['POST'])]
+    public function addAddon(Request $request, Ticket $ticket, int $addonId): Response
+    {
+        $addon = $this->em->getRepository(ShopAddon::class)->find($addonId);
+        
+        if (!$addon) {
+            $this->addFlash('error', 'Addon nicht gefunden');
+            return $this->redirectToRoute('admin_payment');
+        }
+
+        try {
+            $this->shopService->addAddonToTicketWithCateringBalance($ticket, $addon);
+            $this->addFlash('success', sprintf('Addon "%s" erfolgreich gebucht', $addon->getName()));
+        } catch (\Exception $e) {
+            $this->addFlash('error', sprintf('Fehler beim Buchen: %s', $e->getMessage()));
+        }
+
+        return $this->redirectToRoute('admin_payment');
     }
 }

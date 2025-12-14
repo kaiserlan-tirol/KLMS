@@ -151,7 +151,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Session timeout management
+    // Session timeout management - DISABLED on scan page (no user session yet)
+    // Only active on pages with logged-in users (products, payment, etc.)
+    /*
     let inactivityTimer;
     let warningToastTimer;
     const sessionTimeout = 2 * 60 * 1000; // 2 minutes
@@ -255,6 +257,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     resetInactivityTimer();
+    */
 });
 </script>
 

@@ -569,10 +569,10 @@ class ShopService
             $priceEach = $addon->getPrice();
             if ($priceEach > 0) {
                 try {
-                    $this->transactionService->processAdditionalShopOrderPayment(
+                    $this->transactionService->addManualCredit(
                         $order->getOrderer(),
-                        $priceEach * $quantity,
-                        $order->getId(),
+                        -($priceEach * $quantity), // Negative for payment
+                        'shop',
                         'Addon hinzugefügt: ' . $addon->getName()
                     );
                 } catch (\Throwable $txe) {
@@ -584,5 +584,79 @@ class ShopService
                 }
             }
         }
+    }
+
+    /**
+     * Add an addon (e.g., foodflat) to a specific ticket and deduct the price from catering balance
+     * This is used when a user buys an addon after already purchasing their ticket
+     *
+     * @param Ticket $ticket The ticket to add the addon to
+     * @param ShopAddon $addon The addon to add
+     * @return void
+     * @throws \Exception If the ticket doesn't have an order position, order is not paid, addon already exists, or insufficient balance
+     */
+    public function addAddonToTicketWithCateringBalance(Ticket $ticket, ShopAddon $addon): void
+    {
+        // Get the ticket's order position
+        $ticketPosition = $ticket->getShopOrderPosition();
+        if (!$ticketPosition) {
+            throw new \Exception('Ticket hat keine zugeordnete Bestellung');
+        }
+
+        $order = $ticketPosition->getOrder();
+        if (!$order || $order->getStatus() !== ShopOrderStatus::Paid) {
+            throw new \Exception('Ticket-Bestellung ist nicht bezahlt');
+        }
+
+        // Check if addon already exists on this ticket
+        foreach ($ticketPosition->getAddons() as $existingAddon) {
+            if ($existingAddon->getAddon() && $existingAddon->getAddon()->getId() === $addon->getId()) {
+                throw new \Exception('Addon bereits vorhanden auf diesem Ticket');
+            }
+        }
+
+        // Check if addon is one-per-ticket and user already has it
+        if ($addon->isOnePerTicket()) {
+            $redeemer = $ticket->getRedeemer();
+            if ($redeemer && $this->userHasAddon($redeemer, $addon)) {
+                throw new \Exception('Addon kann nur einmal pro Ticket gebucht werden');
+            }
+        }
+
+        $addonPrice = $addon->getPrice();
+
+        // Deduct from catering balance if price > 0 (allow negative balance)
+        if ($addonPrice > 0) {
+            $this->transactionService->addManualCredit(
+                $order->getOrderer(),
+                -$addonPrice, // Negative for deduction
+                'catering',
+                sprintf('Addon gebucht: %s', $addon->getName())
+            );
+        }
+
+        // Add the addon to the ticket
+        $addonPosition = (new ShopOrderPositionAddon())->fillWithAddon($addon, $ticketPosition);
+        $order->addShopOrderPosition($addonPosition);
+        $ticketPosition->addAddon($addonPosition);
+
+        // Add to order history
+        $order->addShopOrderHistory(
+            (new ShopOrderHistory())
+                ->setLoggedAt(new \DateTimeImmutable())
+                ->setAction(ShopOrderHistoryAction::AddonAdded)
+        );
+
+        $this->em->persist($order);
+        $this->em->persist($addonPosition);
+        $this->em->flush();
+
+        $this->logger->info('Addon added to ticket via catering balance', [
+            'ticket_id' => $ticket->getId(),
+            'addon_id' => $addon->getId(),
+            'addon_name' => $addon->getName(),
+            'price' => $addonPrice,
+            'user_id' => $order->getOrderer()->toString()
+        ]);
     }
 }
