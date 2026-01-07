@@ -1,0 +1,23 @@
+{% if settings.get("lan.signup.enabled") and ((app.user.user is not defined) or (app.user.user is defined and app.user.user is not seated_user)) %}
+
+<div class="card-body row justify-content-center">
+    <h2 class="h4 mb-3">
+        Du willst dabei sein?
+    </h2>
+    <div style="text-align: left">
+        <ol>
+            {% if app.user.user is not defined %}
+            <li><a href="{{ path('register') }}">Registrieren</a> oder <a href="{{ path('app_login') }}">einloggen</a></li>  
+            {% endif %}
+            {% if app.user.user is not defined or app.user.user is not registered_user %}
+            <li>Ticket im <a href="{{ path('shop_checkout') }}">Lan-Ticket-Shop</a> kaufen</li>
+            {% endif %}
+            {% if app.user.user is not defined or app.user.user is not seated_user %}
+            <li>Bestätigungsemail empfangen und bezahlen</li>
+            <li>Bei Gruppenanmeldungen kann euch ein Block vorreserviert werden, sodass ihr beisammen sitzt</li>
+            <li>Nach Erhalt der Zahlungsbestätigung im <a href="{{ url('seatmap') }}">Sitzplan</a> deinen Platz wählen</li>
+            {% endif %}
+        </ol>
+    </div>
+</div>
+{% endif %}

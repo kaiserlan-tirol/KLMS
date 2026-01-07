@@ -77,11 +77,10 @@ class CheckinController extends AbstractController
             ->setAction($this->generateUrl('admin_checkin_update', ['id' => $ticket->getId()]));
         $form->add('cateringQrCode', TextType::class, [
             'required' => true,
-            'label' => 'Catering QR-Code',
+            'label' => '2) Catering QR-Code',
             'data' => $ticket->getCateringQrCode(), // Pre-fill if already set
             'attr' => [
-                'placeholder' => 'QR-Code scannen',
-                'autofocus' => true
+                'placeholder' => 'QR-Code scannen oder eingeben',
             ]
         ]);
         $form->add('punch', SubmitType::class);
@@ -125,42 +124,49 @@ class CheckinController extends AbstractController
         $form->handleRequest($request);
         $user = $this->userService->getUsers([$ticket->getRedeemer()])[0];
         $error = "";
-        if ($form->isSubmitted() && $form->isValid()) {
-            try {
-                switch (true) {
-                    case self::clickedIfExists($form, 'punch'):
-                        // Get catering QR code from form and set it on the ticket
-                        $cateringQrCode = $form->get('cateringQrCode')->getData();
-                        if (!empty($cateringQrCode)) {
-                            $ticket->setCateringQrCode($cateringQrCode);
-                        }
-                        
-                        // Now punch the ticket (which validates catering QR code is present)
-                        $this->ticketService->punchTicket($ticket);
-                        
-                        // If catering QR code is a valid UUID, also create KLCS account
-                        if (!empty($cateringQrCode) && Uuid::isValid($cateringQrCode)) {
-                            try {
-                                $this->klcsConnectorService->createAccount($user, Uuid::fromString($cateringQrCode));
-                                $this->addFlash('success', "Catering-Account erfolgreich verbunden!");
-                            } catch (\Exception $e) {
-                                $this->addFlash('warning', "Catering-Account konnte nicht verbunden werden: " . $e->getMessage());
-                            }
-                        }
-                        break;
-                    default:
-                        $this->addFlash('error', "Aktion konnte nicht durchgeführt werden");
-                        return $this->redirectToRoute('admin_checkin');
+        
+        if ($form->isSubmitted()) {
+            if (!$form->isValid()) {
+                // Debug: Show validation errors
+                foreach ($form->getErrors(true) as $error) {
+                    $this->addFlash('error', 'Validierungsfehler: ' . $error->getMessage());
                 }
-            } catch (TicketLivecycleException $exception) {
-                $this->addFlash('error', "Aktion konnte nicht durchgeführt werden ({$exception->getMessage()}).");
-                return $this->redirectToRoute('admin_checkin');
-            }
-            if (!empty($error)) {
-                $this->addFlash('error', $error);
             } else {
-                $this->addFlash('success', "User " . $user->getNickname() . " erfolgreich eingechecked!");
+                try {
+                    switch (true) {
+                        case self::clickedIfExists($form, 'punch'):
+                            // Get catering QR code from form and set it on the ticket
+                            $cateringQrCode = $form->get('cateringQrCode')->getData();
+                            if (!empty($cateringQrCode)) {
+                                $ticket->setCateringQrCode($cateringQrCode);
+                            }
+                            
+                            // Now punch the ticket (which validates catering QR code is present)
+                            $this->ticketService->punchTicket($ticket);
+                            
+                            // If catering QR code is a valid UUID, also create KLCS account
+                            if (!empty($cateringQrCode) && Uuid::isValid($cateringQrCode)) {
+                                try {
+                                    $this->klcsConnectorService->createAccount($user, Uuid::fromString($cateringQrCode));
+                                    $this->addFlash('success', "Catering-Account erfolgreich verbunden!");
+                                } catch (\Exception $e) {
+                                    $this->addFlash('warning', "Catering-Account konnte nicht verbunden werden: " . $e->getMessage());
+                                }
+                            }
+                            
+                            $this->addFlash('success', "User " . $user->getNickname() . " erfolgreich eingechecked!");
+                            break;
+                        default:
+                            $this->addFlash('error', "Aktion konnte nicht durchgeführt werden");
+                            return $this->redirectToRoute('admin_checkin');
+                    }
+                } catch (TicketLivecycleException $exception) {
+                    $this->addFlash('error', "Aktion konnte nicht durchgeführt werden ({$exception->getMessage()}).");
+                    return $this->redirectToRoute('admin_checkin');
+                }
             }
+        } else {
+            $this->addFlash('error', 'Formular wurde nicht submitted');
         }
 
         return $this->redirectToRoute('admin_checkin');

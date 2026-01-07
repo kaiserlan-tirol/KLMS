@@ -10,6 +10,7 @@ use App\Idm\IdmRepository;
 use App\Service\GroupService;
 use App\Service\SeatmapService;
 use App\Service\TicketService;
+use App\Service\TransactionService;
 use App\Service\UserService;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
@@ -24,14 +25,16 @@ class UserExtension extends AbstractExtension
     private readonly UserService $userService;
     private readonly SeatmapService $seatmapService;
     private readonly TicketService $ticketService;
+    private readonly TransactionService $transactionService;
 
-    public function __construct(IdmManager $manager, UserService $userService, SeatmapService $seatmapService, TicketService $ticketService)
+    public function __construct(IdmManager $manager, UserService $userService, SeatmapService $seatmapService, TicketService $ticketService, TransactionService $transactionService)
     {
         $this->userRepo = $manager->getRepository(User::class);
         $this->clanRepo = $manager->getRepository(Clan::class);
         $this->userService = $userService;
         $this->seatmapService = $seatmapService;
         $this->ticketService = $ticketService;
+        $this->transactionService = $transactionService;
     }
 
     /**
@@ -61,6 +64,8 @@ class UserExtension extends AbstractExtension
             new TwigFilter('user_image', $this->getUserImage(...)),
             new TwigFilter('group_name', $this->getGroupName(...)),
             new TwigFilter('seat', $this->getSeat(...)),
+            new TwigFilter('user_ticket', $this->getUserTicket(...)),
+            new TwigFilter('catering_balance', $this->getCateringBalance(...)),
         ];
     }
 
@@ -160,5 +165,24 @@ class UserExtension extends AbstractExtension
         $names = array_map(fn (Seat $seat) => $seat->generateSeatName(), $seats);
 
         return implode(',', $names);
+    }
+
+    public function getUserTicket(User|UuidInterface $user): ?\App\Entity\Ticket
+    {
+        if ($user instanceof User) {
+            $user = $user->getUuid();
+        }
+
+        return $this->ticketService->getTicketUser($user);
+    }
+
+    public function getCateringBalance(User|UuidInterface $user): int
+    {
+        if ($user instanceof User) {
+            $user = $user->getUuid();
+        }
+
+        $balance = $this->transactionService->getUserBalance($user);
+        return $balance->getCateringBalance();
     }
 }

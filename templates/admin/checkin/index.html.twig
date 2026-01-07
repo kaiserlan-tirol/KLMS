@@ -44,7 +44,11 @@
                                 <td>
                                     {% if ticket.isRedeemed() %}
                                         {% if ticket.isPunched() %}
-                                            <span class="badge badge-success">Checked-In</span>
+                                            {% if ticket.cateringQrCode is not empty %}
+                                                <span class="badge badge-success text-monospace">QR: {{ ticket.cateringQrCode }}</span>
+                                            {% else %}
+                                                <span class="badge badge-success">Checked-In</span>
+                                            {% endif %}
                                         {% endif %}
 
                                         {% set user = ticket.redeemer | user %}

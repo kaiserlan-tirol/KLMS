@@ -133,6 +133,7 @@
             </div>
         </div>
 
+        {{ form_start(ticketCheckinForm) }}
         <div class="row">
             <div class="col-md-8">
                 <div class="card mb-4">
@@ -159,7 +160,11 @@
             <div class="col-md-4">
                 <div class="card mb-4">
                     <div class="card-header">
-                        Catering Band verbinden (optional)
+                        {% if klcsEnabled %}
+                            Catering Band verbinden (optional)
+                        {% else %}
+                            Catering
+                        {% endif %}
                     </div>
                     {% if klcsEnabled %}
                     <div class="card-body" data-controller="admin-checkin" data-action="submit->admin-checkin#submitForm">
@@ -167,30 +172,18 @@
                     </div>
                     {% else %}
                         <div class="card-body">
-                            Diese Funktion ist deaktiviert. <br/>
-                            <button type="button" disabled="disabled" class="btn btn-sm mr-1 btn-outline-dark">2) Cateringaccount anlegen
-                            </button>
+                            {{ form_row(ticketCheckinForm.cateringQrCode, {'attr': {'autofocus': 'autofocus', 'placeholder': 'QR-Code scannen'}}) }}
+                            {{ form_widget(ticketCheckinForm._token) }}
+                            <div class="mt-3">
+                                <a class="btn btn-secondary" href="{{ path('admin_checkin') }}">Abbrechen</a>
+                                {{ form_widget(ticketCheckinForm.punch, {'label' : '3) Ticket einchecken', 'attr': {'class': 'btn btn-primary'}}) }}
+                            </div>
                         </div>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <div class="row mb-4">
-            <div class="col">
-            </div>
-        </div>
-        <hr>
-        {{ form_start(ticketCheckinForm) }}
-        <div class="row">
-            <div class="col-md-6">
-                {{ form_row(ticketCheckinForm.cateringQrCode) }}
-            </div>
-        </div>
-        <div class="float-right">
-            <a class="btn btn-secondary" href="{{ path('admin_checkin') }}">Abbrechen</a>
-            {{ form_widget(ticketCheckinForm.punch, {'label' : '3) Ticket einchecken'}) }}
-        </div>
         {{ form_end(ticketCheckinForm) }}
     </div>
 {% endblock %}

@@ -180,7 +180,7 @@ class ShopService
                 $order->getOrderer(),
                 $order->calculateTotal(),
                 $order->getId(),
-                'Manual payment confirmation via admin interface'
+                'Zahlungsbestätigung durch Admin'
             );
             
             $this->logger->info('Created transaction record for manually confirmed shop order', [
