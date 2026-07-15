@@ -37,7 +37,6 @@
                     <div class="col-3 mr-2 text-center">
                         <i class="far fa-user fa-5x"></i>
                     </div>
-                    {% set user = seat.owner | user %}
                     <div class="col">
                         <i class="fas fa-headset fa-fw mr-2" title="Name"></i>
                         <div title="Nickname" class="h5 d-inline-block">
@@ -54,7 +53,6 @@
                     <div class="col-3 mr-2 text-center">
                         <i class="fa fa-users fa-5x"></i>
                     </div>
-                    {% set clan = seat.clanReservation | clan %}
                     {% if clan %}
                     <div class="col">
                         <div>Reserviert für Clan:</div>

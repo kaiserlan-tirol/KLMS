@@ -16,7 +16,6 @@
         {% endif %}
     {% endmacro %}
 
-    {% set user = order.orderer | user %}
     {% block modalBody %}
         {% set dateformat = "d.m.Y H:i" %}
         <div class="container-fluid">
@@ -30,7 +29,7 @@
                 <div class="col-4 text-center">
                     {% set img = user | user_image %}
                     {% if img is not empty %}
-                        <img src="{{ img | imagine_filter('user_img') }}" alt="user image"/>
+                        <img class="profile__user-image" src="{{ img | imagine_filter('user_img') }}" alt="user image"/>
                     {% else %}
                         <i class="far fa-user-circle fa-9x"></i>
                     {% endif %}

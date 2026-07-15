@@ -9,6 +9,7 @@ use App\Exception\OrderLifecycleException;
 use App\Form\ShopAddonType;
 use App\Repository\ShopOrderRepository;
 use App\Service\ShopService;
+use App\Service\UserService;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\IsGranted;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -24,14 +25,16 @@ class ShopController extends AbstractController
     private readonly ShopService $shopService;
     private readonly ShopOrderRepository $orderRepository;
     private readonly SerializerInterface $serializer;
+    private readonly UserService $userService;
 
     private const CSRF_TOKEN_PAYED = 'shopToken';
 
-    public function __construct(ShopService $shopService, ShopOrderRepository $orderRepository, SerializerInterface $serializer)
+    public function __construct(ShopService $shopService, ShopOrderRepository $orderRepository, SerializerInterface $serializer, UserService $userService)
     {
         $this->shopService = $shopService;
         $this->orderRepository = $orderRepository;
         $this->serializer = $serializer;
+        $this->userService = $userService;
     }
 
     #[Route(path: '', name: '', methods: ['GET'])]
@@ -93,8 +96,12 @@ class ShopController extends AbstractController
             throw $this->createNotFoundException();
         }
 
+        $users = $this->userService->getUsers([$order->getOrderer()]);
+        $user = !empty($users) ? $users[0] : null;
+
         return $this->render('admin/shop/show.html.twig', [
             'order' => $order,
+            'user' => $user,
             'fulfillable' => $this->shopService->orderAdheresToLimits($order, true),
             'csrf_token' => self::CSRF_TOKEN_PAYED
         ]);

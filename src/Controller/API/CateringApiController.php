@@ -56,12 +56,13 @@ class CateringApiController extends AbstractController
         $this->entityManager = $entityManager;
         $this->ticketRepository = $ticketRepository;
     }
-    
+
     /**
      * Get users with redeemed tickets and their addons
      * 
      * @return JsonResponse List of users with their redeemed tickets and addons
      */
+    /*
     #[Route(path: '/users-with-tickets', name: '_users_with_tickets', methods: ['GET'])]
     public function getUsersWithTickets(): JsonResponse
     {
@@ -86,6 +87,7 @@ class CateringApiController extends AbstractController
             }
             
             // Get user from IDM
+            // TODO: SUPER SLOW - optimize with batch query
             $user = $this->userRepo->findOneById($position->getTicket()->getRedeemer());
             if (!$user) {
                 continue;
@@ -124,7 +126,8 @@ class CateringApiController extends AbstractController
         
         return new JsonResponse($usersWithTickets);
     }
-    
+    */
+
     /**
      * Create a new catering order
      * 

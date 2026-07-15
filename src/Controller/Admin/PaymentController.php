@@ -7,6 +7,7 @@ use App\Entity\Ticket;
 use App\Exception\TicketLivecycleException;
 use App\Form\UserSelectType;
 use App\Service\ShopService;
+use App\Service\SeatmapService;
 use App\Service\TicketService;
 use App\Service\TicketState;
 use App\Service\UserService;
@@ -29,16 +30,19 @@ class PaymentController extends AbstractController
     private readonly TicketService $ticketService;
     private readonly UserService $userService;
     private readonly ShopService $shopService;
+    private readonly SeatmapService $seatmapService;
     private readonly EntityManagerInterface $em;
 
     public function __construct(TicketService $ticketService,
                                 UserService   $userService,
                                 ShopService   $shopService,
+                                SeatmapService $seatmapService,
                                 EntityManagerInterface $em)
     {
         $this->ticketService = $ticketService;
         $this->userService = $userService;
         $this->shopService = $shopService;
+        $this->seatmapService = $seatmapService;
         $this->em = $em;
     }
 
@@ -107,12 +111,28 @@ class PaymentController extends AbstractController
         $uuids = array_filter($uuids, fn (?UuidInterface $uuid) => !empty($uuid));
         $users = $this->userService->getUsers($uuids, assoc: true);
         
+        // Preload user ages for U18 check
+        $userAges = [];
+        foreach ($users as $uuid => $user) {
+            $userAges[$uuid] = $this->userService->userAgeAbove($user, 18) ?? true;
+        }
+        
+        // Bulk-load seat information to avoid N+1 queries
+        $userSeats = [];
+        $seatsByOwner = $this->seatmapService->getSeatsByOwners(array_keys($users));
+        foreach ($seatsByOwner as $ownerUuid => $seats) {
+            $seatNames = array_map(fn($seat) => $seat->generateSeatName(), $seats);
+            $userSeats[$ownerUuid] = implode(',', $seatNames);
+        }
+        
         // Get all available addons for the filter dropdown
         $addons = $this->shopService->getAddons(all: true);
 
         return $this->render('admin/payment/index.html.twig', [
             'tickets' => $tickets,
             'users' => $users,
+            'userAges' => $userAges,
+            'userSeats' => $userSeats,
             'addons' => $addons,
             'selectedAddon' => $addonFilterId,
             'form_add' => $this->createTicketCreateForm("add", true)->createView(),
@@ -233,12 +253,32 @@ class PaymentController extends AbstractController
         $allAddons = $this->shopService->getAddons();
         $ticketAddons = $this->shopService->getTicketAddons($ticket);
 
+        // Get buyer information from the order
+        $buyer = null;
+        $shopOrderPosition = $ticket->getShopOrderPosition();
+        if ($shopOrderPosition) {
+            $order = $shopOrderPosition->getOrder();
+            if ($order) {
+                $ordererUuid = $order->getOrderer();
+                if ($ordererUuid) {
+                    try {
+                        $buyers = $this->userService->getUsers([$ordererUuid]);
+                        $buyer = !empty($buyers) ? $buyers[0] : null;
+                    } catch (\Exception $e) {
+                        // Buyer not found or IDM error - continue without buyer info
+                        $buyer = null;
+                    }
+                }
+            }
+        }
+
         return $this->render('admin/payment/show.html.twig', [
             'user' => $user,
             'ticket' => $ticket,
             'form' => $form->createView(),
             'allAddons' => $allAddons,
             'ticketAddons' => $ticketAddons,
+            'buyer' => $buyer,
         ]);
     }
 

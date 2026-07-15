@@ -19,10 +19,20 @@
                         <span title="Number: {{ ticket.code }}" class="d-inline-block text-monospace">{{ ticket.code }}</span>
                     </p>
                     <p>
-                        <i class="fas fa-euro fa-fw mr-2" title="Käufer"></i>
-                        <span class="d-inline-block text-muted">Bestellinfo nicht verfügbar</span>
+                        <i class="fas fa-shopping-bag fa-fw mr-2" title="Käufer"></i>
+                        {% if buyer %}
+                            <span class="d-inline-block">
+                                {{ buyer.nickname }}
+                                {% if buyer.clans is not empty %}
+                                    {% for clan in buyer.clans %}
+                                        <span class="badge badge-secondary">{{ clan.clantag }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            <span class="d-inline-block text-muted">manual ticket</span>
+                        {% endif %}
                     </p>
-                    {# TODO: Fix broken shopOrderPosition relationship - entity ID 2 missing #}
                     <p>
                         <i class="fas fa-shopping-cart fa-fw mr-2" title="Gekauft"></i>
                         <span class="d-inline-block">{{ ticket.createdAt | date(dateformat) }}</span>

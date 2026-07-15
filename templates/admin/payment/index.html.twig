@@ -94,8 +94,8 @@
                                         <span class="badge badge-primary">Eingel&ouml;st</span>
                                     {% endif %}
 
-                                    {% set user = ticket.redeemer | user %}
-                                    {% if user is age_below(18) %}
+                                    {% set userUuid = ticket.redeemer.toString() %}
+                                    {% if userAges[userUuid] is defined and not userAges[userUuid] %}
                                         <span class="badge badge-danger">U18</span>
                                     {% endif %}
                                 {% else %}
@@ -104,10 +104,11 @@
                             </td>
                             <td class="text-center">
                                 {% if ticket.isRedeemed %}
-                                    {% if ticket.redeemer is not seated_user %}
+                                    {% set userUuid = ticket.redeemer.toString() %}
+                                    {% if userSeats[userUuid] is not defined or userSeats[userUuid] is empty %}
                                         <span class="badge badge-danger">n.v.</span>
                                     {% else %}
-                                        <span class="badge badge-secondary"><i class="fa-solid fa-chair"></i> {{ ticket.redeemer | seat }}</span>
+                                        <span class="badge badge-secondary"><i class="fa-solid fa-chair"></i> {{ userSeats[userUuid] }}</span>
                                     {% endif %}
                                 {% endif %}
                             </td>

@@ -144,6 +144,36 @@ class SeatmapService
         return $this->seatRepository->count(['owner' => $uuid]);
     }
 
+    /**
+     * Bulk-load seats for multiple owners to avoid N+1 queries
+     * @param array $ownerUuids Array of UUID strings
+     * @return array Associative array [ownerUuid => [Seat, ...]]
+     */
+    public function getSeatsByOwners(array $ownerUuids): array
+    {
+        if (empty($ownerUuids)) {
+            return [];
+        }
+        
+        $seats = $this->seatRepository->createQueryBuilder('s')
+            ->where('s.owner IN (:owners)')
+            ->setParameter('owners', $ownerUuids)
+            ->getQuery()
+            ->getResult();
+        
+        // Group seats by owner UUID
+        $result = [];
+        foreach ($seats as $seat) {
+            $ownerUuid = $seat->getOwner()->toString();
+            if (!isset($result[$ownerUuid])) {
+                $result[$ownerUuid] = [];
+            }
+            $result[$ownerUuid][] = $seat;
+        }
+        
+        return $result;
+    }
+
     public function isSeatBookable(Seat $seat, User $user): bool
     {
         if (!empty($seat->getClanReservation()) && !$this->userService->isUserInClan($user, $seat->getClanReservation())) {

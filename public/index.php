@@ -2,6 +2,9 @@
 use App\Kernel;
 use Symfony\Component\Dotenv\Dotenv;
 
+// Set default timezone
+date_default_timezone_set('Europe/Vienna');
+
 require_once dirname(__DIR__).'/vendor/autoload_runtime.php';
 
 // Force manual loading of .env files to ensure they override Symfony CLI environment

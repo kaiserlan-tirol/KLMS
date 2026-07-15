@@ -10,6 +10,7 @@ use App\Service\KlcsConnectorService;
 use App\Exception\TicketLivecycleException;
 use App\Form\UserSelectType;
 use App\Form\UserType;
+use App\Service\SeatmapService;
 use App\Service\TicketService;
 use App\Service\UserService;
 use Ramsey\Uuid\Uuid;
@@ -33,18 +34,21 @@ class CheckinController extends AbstractController
 {
     private readonly TicketService $ticketService;
     private readonly UserService $userService;
+    private readonly SeatmapService $seatmapService;
     private KlcsConnectorService $klcsConnectorService;
     private IdmManager $manager;
 
     public function __construct(KlcsConnectorService $klcsConnectorService,
                                 IdmManager $manager,
                                 TicketService $ticketService,
-                                UserService $userService
+                                UserService $userService,
+                                SeatmapService $seatmapService
     ){
         $this->klcsConnectorService = $klcsConnectorService;
         $this->manager = $manager;
         $this->ticketService = $ticketService;
         $this->userService = $userService;
+        $this->seatmapService = $seatmapService;
     }
 
     private function createUserSelectForm(): FormInterface
@@ -81,6 +85,7 @@ class CheckinController extends AbstractController
             'data' => $ticket->getCateringQrCode(), // Pre-fill if already set
             'attr' => [
                 'placeholder' => 'QR-Code scannen oder eingeben',
+                'maxlength' => 4,
             ]
         ]);
         $form->add('punch', SubmitType::class);
@@ -107,9 +112,24 @@ class CheckinController extends AbstractController
         $uuids = array_filter($uuids, fn (?UuidInterface $uuid) => !empty($uuid));
         $users = $this->userService->getUsers($uuids, assoc: true);
 
+        // Preload user ages for U18 check
+        $userAges = [];
+        foreach ($users as $uuid => $user) {
+            $userAges[$uuid] = $this->userService->userAgeAbove($user, 18) ?? true;
+        }
+
+        // Bulk-load seat information
+        $userSeats = [];
+        $seatsByOwner = $this->seatmapService->getSeatsByOwners(array_keys($users));
+        foreach ($seatsByOwner as $ownerUuid => $seats) {
+            $userSeats[$ownerUuid] = count($seats) > 0;
+        }
+
         return $this->render('admin/checkin/index.html.twig', [
             'tickets' => $tickets,
             'users' => $users,
+            'userAges' => $userAges,
+            'userSeats' => $userSeats,
         ]);
     }
     private static function clickedIfExists(FormInterface $form, string $field): bool
@@ -154,7 +174,7 @@ class CheckinController extends AbstractController
                                 }
                             }
                             
-                            $this->addFlash('success', "User " . $user->getNickname() . " erfolgreich eingechecked!");
+                            $this->addFlash('success', "User " . $user->getNickname() . " erfolgreich mit " . $cateringQrCode . " eingecheckt.");
                             break;
                         default:
                             $this->addFlash('error', "Aktion konnte nicht durchgeführt werden");

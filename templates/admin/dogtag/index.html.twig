@@ -1,35 +1,13 @@
 {% extends 'admin/adminBase.html.twig' %}
 
-{% block title %}DogTag-Gruppen - KLMS - Admin{% endblock %}
-{% block siteheading %}<i class="fas fa-tags"></i> DogTag-Gruppen{% endblock %}
+{% block title %}DogTag Export - KLMS - Admin{% endblock %}
+{% block siteheading %}<i class="fas fa-tags"></i> DogTag Export{% endblock %}
 {% block main %}
     <div class="row mb-4">
         <div class="col-auto">
             <a class="btn btn-sm btn-secondary" href="{{ path('admin_payment') }}">
                 <i class="fas fa-arrow-left"></i> Zurück zu Tickets
             </a>
-        </div>
-        <div class="col-auto">
-            <a class="btn btn-sm btn-success" href="{{ path('admin_dogtags_export_csv') }}">
-                <i class="fas fa-download"></i> CSV Export
-            </a>
-        </div>
-        <div class="col-auto ml-auto">
-            <form method="get" action="{{ path('admin_dogtags_index') }}" class="form-inline">
-                <div class="input-group">
-                    <input type="text" class="form-control" name="search" placeholder="Suche nach Name..." value="{{ searchQuery|default('') }}">
-                    <div class="input-group-append">
-                        <button class="btn btn-outline-primary" type="submit">
-                            <i class="fas fa-search"></i>
-                        </button>
-                        {% if searchQuery %}
-                            <a href="{{ path('admin_dogtags_index') }}" class="btn btn-outline-secondary">
-                                <i class="fas fa-times"></i>
-                            </a>
-                        {% endif %}
-                    </div>
-                </div>
-            </form>
         </div>
     </div>
 
@@ -51,422 +29,82 @@
         </div>
     {% endfor %}
 
-    <div class="row">
+    <div class="row mb-4">
         <div class="col-12">
-            <h3>DogTag Schablonen-Gruppen</h3>
-            
-            {% if groups is empty %}
-                <div class="alert alert-info">
-                    Noch keine Gruppen zugewiesen.
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-download"></i> DogTag CSV Export</h5>
                 </div>
-            {% else %}
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <form method="post" action="{{ path('admin_dogtags_bulk_mark_done') }}" id="bulkMarkDoneGroupsForm" class="mb-0">
-                            <div class="card bg-success text-white">
-                                <div class="card-body py-2">
-                                    <div class="row align-items-center">
-                                        <div class="col-auto">
-                                            <strong>Als produziert markieren:</strong>
-                                        </div>
-                                        <div class="col-auto ml-auto">
-                                            <button type="submit" class="btn btn-sm btn-light">
-                                                <i class="fas fa-check"></i> Markieren (<span id="selectedGroupNotDoneCount">0</span>)
-                                            </button>
-                                        </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3 mb-md-0">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Alle exportieren</h6>
+                                    <p class="text-muted small">Exportiert alle Gamer mit zugewiesenem Ticket</p>
+                                    <a href="{{ path('admin_dogtags_export_csv') }}" class="btn btn-success btn-block">
+                                        <i class="fas fa-download"></i> Alle exportieren
+                                    </a>
+                                    <div class="mt-2 text-muted small">
+                                        {{ totalUsers }} Gamer
                                     </div>
                                 </div>
                             </div>
-                        </form>
-                    </div>
-                    <div class="col-md-6">
-                        <form method="post" action="{{ path('admin_dogtags_bulk_mark_undone') }}" id="bulkMarkUndoneGroupsForm" class="mb-0">
-                            <div class="card bg-warning text-dark">
-                                <div class="card-body py-2">
-                                    <div class="row align-items-center">
-                                        <div class="col-auto">
-                                            <strong>Produktion zurücksetzen:</strong>
-                                        </div>
-                                        <div class="col-auto ml-auto">
-                                            <button type="submit" class="btn btn-sm btn-dark">
-                                                <i class="fas fa-undo"></i> Zurücksetzen (<span id="selectedGroupDoneCount">0</span>)
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                    
-                {% for groupNumber, groupUsers in groups %}
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h5 class="mb-0">
-                                Gruppe {{ groupNumber }} 
-                                <span class="badge badge-primary">{{ groupUsers|length }} / 16</span>
-                            </h5>
                         </div>
-                        <div class="card-body">
-                            <table class="table table-sm table-hover">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 40px;">
-                                            <input type="checkbox" class="selectAllGroupCheckbox" data-group="{{ groupNumber }}">
-                                        </th>
-                                        <th>Nickname</th>
-                                        <th>Vorname</th>
-                                        <th>Nachname</th>
-                                        <th class="text-center">Ticket</th>
-                                        <th class="text-center">Produziert</th>
-                                        <th class="text-center">Aktion</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in groupUsers %}
-                                        {% set user = item.user %}
-                                        <tr>
-                                            <td>
-                                                {% if item.ticket %}
-                                                    {% if not item.dogtagDone %}
-                                                        <input type="checkbox" form="bulkMarkDoneGroupsForm" name="ticketIds[]" value="{{ item.ticket.id }}" class="group-checkbox-notdone group-{{ groupNumber }}-checkbox-notdone">
-                                                    {% else %}
-                                                        <input type="checkbox" form="bulkMarkUndoneGroupsForm" name="ticketIds[]" value="{{ item.ticket.id }}" class="group-checkbox-done group-{{ groupNumber }}-checkbox-done">
-                                                    {% endif %}
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% for clan in user.clans %}
-                                                    <span class="badge badge-pill badge-primary">{{ clan.clantag }}</span>
-                                                {% endfor %}
-                                                <strong class="copy-nickname" style="cursor: pointer;" title="Klicken zum Kopieren">{{ user.nickname }}</strong>
-                                            </td>
-                                            <td>{{ user.firstname }}</td>
-                                            <td>{{ user.surname }}</td>
-                                            <td class="text-center">
-                                                {% if item.hasTicket %}
-                                                    <span class="badge badge-success"><i class="fas fa-check"></i></span>
-                                                {% else %}
-                                                    <span class="badge badge-secondary"><i class="fas fa-times"></i></span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center">
-                                                {% if item.ticket %}
-                                                    {% if item.dogtagDone %}
-                                                        <span class="badge badge-success"><i class="fas fa-check"></i> Produziert</span>
-                                                    {% else %}
-                                                        <span class="badge badge-secondary">Ausstehend</span>
-                                                    {% endif %}
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center">
-                                                <form method="post" action="{{ path('admin_dogtags_unassign', {'uuid': user.uuid}) }}" style="display: inline;">
-                                                    <button type="submit" class="btn btn-sm btn-danger" 
-                                                            onclick="return confirm('Benutzer aus Gruppe entfernen?')">
-                                                        <i class="fas fa-times"></i>
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                    
-                                    {# Show empty slots if group has less than 16 users #}
-                                    {% set emptySlots = 16 - groupUsers|length %}
-                                    {% if emptySlots > 0 %}
-                                        {% for i in 1..emptySlots %}
-                                            <tr class="table-secondary">
-                                                <td colspan="7" class="text-center text-muted">
-                                                    <em>Freier Platz {{ i }}</em>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
+                        
+                        <div class="col-md-4 mb-3 mb-md-0">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Seit letztem Export</h6>
+                                    <p class="text-muted small">
+                                        {% if lastExportDate %}
+                                            Letzter Export: {{ lastExportDate|date('d.m.Y H:i') }}
+                                        {% else %}
+                                            Noch kein Export durchgeführt
+                                        {% endif %}
+                                    </p>
+                                    {% if lastExportDate and newUsersSinceExport > 0 %}
+                                        <a href="{{ path('admin_dogtags_export_csv', {since: lastExportDate|date('Y-m-d H:i:s')}) }}" class="btn btn-info btn-block">
+                                            <i class="fas fa-download"></i> Exportieren
+                                        </a>
+                                        <div class="mt-2 text-muted small">
+                                            {{ newUsersSinceExport }} neue Gamer
+                                        </div>
+                                    {% else %}
+                                        <button class="btn btn-secondary btn-block" disabled>
+                                            <i class="fas fa-download"></i> Exportieren
+                                        </button>
+                                        <div class="mt-2 text-muted small">
+                                            0 neue Gamer
+                                        </div>
                                     {% endif %}
-                                </tbody>
-                            </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Export-Zeitstempel setzen</h6>
+                                    <p class="text-muted small">Zeitpunkt des letzten Exports festlegen</p>
+                                    <form method="post" action="{{ path('admin_dogtags_set_exported') }}" onsubmit="return confirm('Export-Zeitstempel setzen?')">
+                                        <div class="form-group">
+                                            <input type="datetime-local" 
+                                                   name="timestamp" 
+                                                   class="form-control form-control-sm mb-2" 
+                                                   value="{{ 'now'|date('Y-m-d\\TH:i') }}" 
+                                                   required>
+                                        </div>
+                                        <button type="submit" class="btn btn-warning btn-block">
+                                            <i class="fas fa-clock"></i> Zeitstempel setzen
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                {% endfor %}
-                </form>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="row mt-5">
-        <div class="col-12">
-            <h3>Nicht zugewiesene Benutzer mit Tickets</h3>
-            
-            {% if unassignedUsers is empty %}
-                <div class="alert alert-success">
-                    Alle Benutzer mit Tickets wurden Gruppen zugewiesen!
                 </div>
-            {% else %}
-                <form method="post" action="{{ path('admin_dogtags_bulk_assign') }}" id="bulkAssignForm">
-                    <div class="card">
-                        <div class="card-header">
-                            <div class="row align-items-center">
-                                <div class="col-auto">
-                                    <label class="mb-0">
-                                        <input type="checkbox" id="selectAll"> Alle auswählen
-                                    </label>
-                                </div>
-                                <div class="col-auto">
-                                    <select name="groupNumber" class="form-control form-control-sm" required>
-                                        <option value="">Gruppe wählen...</option>
-                                        <option value="auto">Auto (nächste freie Gruppe)</option>
-                                        {% for group in availableGroups %}
-                                            <option value="{{ group.number }}">Gruppe {{ group.number }} ({{ group.free }} frei)</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-auto">
-                                    <button type="submit" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-save"></i> Ausgewählte zuweisen (<span id="selectedCount">0</span>)
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <table class="table table-sm table-hover">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 40px;">
-                                            <input type="checkbox" class="selectAllCheckbox" data-target="user-checkbox">
-                                        </th>
-                                        <th>Nickname</th>
-                                        <th>Vorname</th>
-                                        <th>Nachname</th>
-                                        <th class="text-center">Ticket</th>
-                                        <th class="text-center">Produziert</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in unassignedUsers %}
-                                        {% set user = item.user %}
-                                        <tr>
-                                            <td>
-                                                <input type="checkbox" name="uuids[]" value="{{ user.uuid }}" class="user-checkbox">
-                                            </td>
-                                            <td>
-                                                {% for clan in user.clans %}
-                                                    <span class="badge badge-pill badge-primary">{{ clan.clantag }}</span>
-                                                {% endfor %}
-                                                <strong class="copy-nickname" style="cursor: pointer;" title="Klicken zum Kopieren">{{ user.nickname }}</strong>
-                                            </td>
-                                            <td>{{ user.firstname }}</td>
-                                            <td>{{ user.surname }}</td>
-                                            <td class="text-center">
-                                                {% if item.hasTicket %}
-                                                    <span class="badge badge-success"><i class="fas fa-check"></i></span>
-                                                {% else %}
-                                                    <span class="badge badge-secondary"><i class="fas fa-times"></i></span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center">
-                                                {% if item.ticket %}
-                                                    {% if item.dogtagDone %}
-                                                        <form method="post" action="{{ path('admin_dogtags_mark_undone', {'ticketId': item.ticket.id}) }}" style="display: inline;">
-                                                            <button type="submit" class="btn btn-sm btn-success" title="Als nicht produziert markieren">
-                                                                <i class="fas fa-check"></i>
-                                                            </button>
-                                                        </form>
-                                                    {% else %}
-                                                        <form method="post" action="{{ path('admin_dogtags_mark_done', {'ticketId': item.ticket.id}) }}" style="display: inline;">
-                                                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Als produziert markieren">
-                                                                <i class="far fa-square"></i>
-                                                            </button>
-                                                        </form>
-                                                    {% endif %}
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </form>
-                
-                {# Bulk mark as done form #}
-                <form method="post" action="{{ path('admin_dogtags_bulk_mark_done') }}" id="bulkMarkDoneForm" class="mt-3">
-                    <div class="card">
-                        <div class="card-header bg-success text-white">
-                            <div class="row align-items-center">
-                                <div class="col-auto">
-                                    <strong>Massenmarkierung</strong>
-                                </div>
-                                <div class="col-auto ml-auto">
-                                    <button type="submit" class="btn btn-sm btn-light">
-                                        <i class="fas fa-check"></i> Ausgewählte als produziert markieren
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <p class="mb-0">Wählen Sie DogTags aus der obigen Liste aus und klicken Sie auf "Markieren", um sie als produziert zu kennzeichnen.</p>
-                        </div>
-                    </div>
-                </form>
-            {% endif %}
+            </div>
         </div>
     </div>
-    
-    <script>
-        // Click-to-copy nickname functionality
-        document.querySelectorAll('.copy-nickname').forEach(element => {
-            element.addEventListener('click', function() {
-                const text = this.textContent;
-                navigator.clipboard.writeText(text).then(() => {
-                    // Visual feedback
-                    const original = this.style.backgroundColor;
-                    this.style.backgroundColor = '#28a745';
-                    this.style.color = 'white';
-                    this.style.padding = '2px 6px';
-                    this.style.borderRadius = '3px';
-                    
-                    setTimeout(() => {
-                        this.style.backgroundColor = original;
-                        this.style.color = '';
-                        this.style.padding = '';
-                        this.style.borderRadius = '';
-                    }, 500);
-                }).catch(err => {
-                    console.error('Failed to copy:', err);
-                    alert('Kopieren fehlgeschlagen');
-                });
-            });
-        });
-        
-        // Update selected counts for groups
-        function updateSelectedGroupCounts() {
-            const notDoneCount = document.querySelectorAll('.group-checkbox-notdone:checked').length;
-            const doneCount = document.querySelectorAll('.group-checkbox-done:checked').length;
-            document.getElementById('selectedGroupNotDoneCount').textContent = notDoneCount;
-            document.getElementById('selectedGroupDoneCount').textContent = doneCount;
-        }
-        
-        // Update selected count for unassigned users
-        function updateSelectedCount() {
-            const count = document.querySelectorAll('.user-checkbox:checked').length;
-            document.getElementById('selectedCount').textContent = count;
-        }
-        
-        // Select all in group functionality
-        document.querySelectorAll('.selectAllGroupCheckbox').forEach(checkbox => {
-            checkbox.addEventListener('change', function(e) {
-                const groupNumber = this.getAttribute('data-group');
-                const notDoneCheckboxes = document.querySelectorAll('.group-' + groupNumber + '-checkbox-notdone');
-                const doneCheckboxes = document.querySelectorAll('.group-' + groupNumber + '-checkbox-done');
-                notDoneCheckboxes.forEach(cb => cb.checked = e.target.checked);
-                doneCheckboxes.forEach(cb => cb.checked = e.target.checked);
-                updateSelectedGroupCounts();
-            });
-        });
-        
-        // Update count when individual group checkboxes change
-        document.querySelectorAll('.group-checkbox-notdone, .group-checkbox-done').forEach(cb => {
-            cb.addEventListener('change', updateSelectedGroupCounts);
-        });
-        
-        // Select all functionality for unassigned users
-        document.getElementById('selectAll')?.addEventListener('change', function(e) {
-            const checkboxes = document.querySelectorAll('.user-checkbox');
-            checkboxes.forEach(cb => cb.checked = e.target.checked);
-            updateSelectedCount();
-        });
-        
-        // Update count when individual checkboxes change
-        document.querySelectorAll('.user-checkbox').forEach(cb => {
-            cb.addEventListener('change', updateSelectedCount);
-        });
-        
-        // Validate form submission
-        document.getElementById('bulkAssignForm')?.addEventListener('submit', function(e) {
-            const checked = document.querySelectorAll('.user-checkbox:checked').length;
-            if (checked === 0) {
-                e.preventDefault();
-                alert('Bitte wählen Sie mindestens einen Benutzer aus.');
-                return false;
-            }
-            
-            const groupSelect = this.querySelector('[name="groupNumber"]');
-            if (!groupSelect.value) {
-                e.preventDefault();
-                alert('Bitte wählen Sie eine Gruppe aus.');
-                return false;
-            }
-            
-            return confirm(`${checked} Benutzer zur Gruppe zuweisen?`);
-        });
-        
-        // Bulk mark as done form submission for groups
-        document.getElementById('bulkMarkDoneGroupsForm')?.addEventListener('submit', function(e) {
-            const checkedBoxes = document.querySelectorAll('.group-checkbox-notdone:checked');
-            if (checkedBoxes.length === 0) {
-                e.preventDefault();
-                alert('Bitte wählen Sie mindestens einen DogTag aus.');
-                return false;
-            }
-            
-            return confirm(`${checkedBoxes.length} DogTag(s) als produziert markieren?`);
-        });
-        
-        // Bulk mark as undone form submission for groups
-        document.getElementById('bulkMarkUndoneGroupsForm')?.addEventListener('submit', function(e) {
-            const checkedBoxes = document.querySelectorAll('.group-checkbox-done:checked');
-            if (checkedBoxes.length === 0) {
-                e.preventDefault();
-                alert('Bitte wählen Sie mindestens einen produzierten DogTag aus.');
-                return false;
-            }
-            
-            return confirm(`${checkedBoxes.length} DogTag(s) zurücksetzen (als nicht produziert markieren)?`);
-        });
-        
-        // Bulk mark as done form submission for unassigned users
-        document.getElementById('bulkMarkDoneForm')?.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const checkedBoxes = document.querySelectorAll('.user-checkbox:checked');
-            if (checkedBoxes.length === 0) {
-                alert('Bitte wählen Sie mindestens einen Benutzer aus.');
-                return false;
-            }
-            
-            // Collect ticket IDs from checked users
-            const ticketIds = [];
-            checkedBoxes.forEach(cb => {
-                // Find the ticket ID from the closest row
-                const row = cb.closest('tr');
-                const doneButton = row.querySelector('form[action*="mark_done"] button, form[action*="mark_undone"] button');
-                if (doneButton) {
-                    const form = doneButton.closest('form');
-                    const action = form.getAttribute('action');
-                    const match = action.match(/ticketId[=\/](\d+)/);
-                    if (match) {
-                        ticketIds.push(match[1]);
-                    }
-                }
-            });
-            
-            if (ticketIds.length === 0) {
-                alert('Keine Tickets zum Markieren gefunden.');
-                return false;
-            }
-            
-            if (confirm(`${ticketIds.length} DogTag(s) als produziert markieren?`)) {
-                // Add ticket IDs to form
-                ticketIds.forEach(id => {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = 'ticketIds[]';
-                    input.value = id;
-                    this.appendChild(input);
-                });
-                
-                this.submit();
-            }
-            
-            return false;
-        });
-    </script>
 {% endblock %}

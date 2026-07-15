@@ -51,12 +51,12 @@
                                             {% endif %}
                                         {% endif %}
 
-                                        {% set user = ticket.redeemer | user %}
-                                        {% if user is age_below(18) %}
+                                        {% set userUuid = ticket.redeemer.toString() %}
+                                        {% if userAges[userUuid] is defined and not userAges[userUuid] %}
                                             <span class="badge badge-danger">U18</span>
                                         {% endif %}
                                         
-                                        {% if ticket.redeemer is not seated_user %}
+                                        {% if userSeats[userUuid] is not defined or not userSeats[userUuid] %}
                                             <span class="badge badge-warning">Kein Sitzplatz</span>
                                         {% endif %}
                                     {% else %}
@@ -65,8 +65,8 @@
                                 </td>
                                 <td>
                                     {% if not ticket.isPunched() %}
-                                        <a class="btn btn-sm btn-outline-dark text-nowrap" href="{{ path('admin_checkin_show', {'id' : ticket.id}) }}">
-                                            <i class="fas fa-ticket"></i> CheckIn
+                                        <a class="btn btn-sm btn-outline-dark text-nowrap" target="_blank" href="{{ path('admin_checkin_show', {'id' : ticket.id}) }}">
+                                            <i class="fas fa-ticket"></i> CheckIn <i class="fas fa-external-link"></i>
                                         </a>
                                     {% endif %}
                                 </td>

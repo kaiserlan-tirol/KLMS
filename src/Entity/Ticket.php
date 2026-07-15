@@ -42,9 +42,6 @@ class Ticket
     #[ORM\Column(length: 4, nullable: true)]
     private ?string $cateringQrCode = null;
 
-    #[ORM\Column(type: 'boolean', nullable: true, options: ['default' => false])]
-    private ?bool $dogtagDone = false;
-
     public function getId(): ?int
     {
         return $this->id;
@@ -153,18 +150,6 @@ class Ticket
     public function setCateringQrCode(?string $cateringQrCode): static
     {
         $this->cateringQrCode = $cateringQrCode;
-        
-        return $this;
-    }
-
-    public function isDogtagDone(): ?bool
-    {
-        return $this->dogtagDone;
-    }
-
-    public function setDogtagDone(?bool $dogtagDone): static
-    {
-        $this->dogtagDone = $dogtagDone;
         
         return $this;
     }

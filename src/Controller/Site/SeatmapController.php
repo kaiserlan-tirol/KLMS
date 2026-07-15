@@ -116,6 +116,8 @@ class SeatmapController extends AbstractController
         return $this->render('site/seatmap/seat.html.twig', [
             'seat' => $seat,
             'form' => $view,
+            'user' => $seat->getOwner() ? $this->seatmapService->getSeatOwner($seat) : null,
+            'clan' => $seat->getClanReservation() ? $this->seatmapService->getSeatReservationClan($seat) : null,
         ]);
     }
 }

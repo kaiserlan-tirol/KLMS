@@ -397,7 +397,20 @@ class ShopService
     public function getOrders(): array
     {
         $orders = $this->orderRepository->findAll();
-        $uuids = array_map(fn($o) => $o->getOrderer(), $orders);
+        
+        // Extract UUIDs and build result in single pass
+        $uuids = [];
+        $result = [];
+        foreach ($orders as $order) {
+            $uuidObj = $order->getOrderer();
+            $uuidStr = $uuidObj->toString();
+            $uuids[] = $uuidObj;
+            $result[] = [
+                'user' => null, // Will be filled after bulk fetch
+                'order' => $order,
+                'uuid' => $uuidStr
+            ];
+        }
 
         // Bulk fetch users and index by UUID
         $users = $this->userRepo->findById($uuids);
@@ -406,14 +419,12 @@ class ShopService
             $usersByUuid[$user->getUuid()->toString()] = $user;
         }
 
-        $result = [];
-        foreach ($orders as $item) {
-            $uuid = $item->getOrderer()->toString();
-            $result[] = [
-                'user' => $usersByUuid[$uuid] ?? null,
-                'order' => $item
-            ];
+        // Fill in users
+        foreach ($result as &$item) {
+            $item['user'] = $usersByUuid[$item['uuid']] ?? null;
+            unset($item['uuid']); // Remove temporary key
         }
+        
         return $result;
     }
 

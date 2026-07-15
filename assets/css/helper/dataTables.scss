@@ -1,6 +1,8 @@
 @import '~datatables.net-bs4';
 
 div.dataTables_wrapper {
+    overflow: auto;
+
     div.dataTables_length {
         padding-top:$spacer;
         padding-left:$spacer;
