@@ -4,7 +4,7 @@ set +e
 # deploy klms
 # ./deploy.sh
 
-LANFOLDER="lan04"
+LANFOLDER="lan05"
 BASE_DIR=`dirname $0`
 
 
