@@ -31,23 +31,30 @@
                         <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-ticket-alt"></i> Ticket {{ i + 1 }} - Add-ons
+                                <span class="badge badge-success ticket-free-badge d-none">Eintritt gratis</span>
                             </h5>
                         </div>
                         <div class="card-body">
+                            {{ form_errors(form[ticket_addon_field]) }}
                             {% if addons is not empty %}
                                 <div class="row">
                                     {% for addon in addons %}
                                         {% set addon_field_name = 'addon' ~ addon.id %}
                                         {% if form[ticket_addon_field][addon_field_name] is defined %}
                                             <div class="col-md-6 col-lg-4 mb-3">
-                                                <div class="card addon-card">
+                                                <div class="card addon-card"
+                                                     data-addon-id="{{ addon.id }}"
+                                                     data-price="{{ addon.price }}"
+                                                     data-zeros-ticket="{{ addon.zerosTicketPrice ? 1 : 0 }}"
+                                                     data-zeros-addons="{{ addon.zerosAddons|map(a => a.id)|join(',') }}">
                                                     <div class="card-body">
                                                         <h6 class="card-title">{{ addon.name }}</h6>
                                                         {% if addon.description %}
                                                             <p class="card-text text-muted small">{{ addon.description }}</p>
                                                         {% endif %}
                                                         <div class="addon-price mb-2">
-                                                            <strong>{{ (addon.price / 100)|number_format(2, ',', '.') }} €</strong>
+                                                            <strong class="addon-price-value">{{ (addon.price / 100)|number_format(2, ',', '.') }} €</strong>
+                                                            <span class="badge badge-success addon-gratis-badge d-none">gratis</span>
                                                         </div>
                                                         <div class="addon-control">
                                                             {% set field = form[ticket_addon_field][addon_field_name] %}

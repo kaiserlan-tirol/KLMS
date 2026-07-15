@@ -58,10 +58,15 @@ class ShopOrderPositionAddon extends ShopOrderPosition
         return $this;
     }
 
-    public function fillWithAddon(ShopAddon $addon, ?ShopOrderPositionTicket $ticket = null): self
+    public function fillWithAddon(ShopAddon $addon, ?ShopOrderPositionTicket $ticket = null, ?ShopAddon $zeroedBy = null): self
     {
-        $this->setText($addon->getName());
-        $this->setPrice($addon->getPrice());
+        if ($zeroedBy) {
+            $this->setText(sprintf('%s (gratis: %s)', $addon->getName(), $zeroedBy->getName()));
+            $this->setPrice(0);
+        } else {
+            $this->setText($addon->getName());
+            $this->setPrice($addon->getPrice());
+        }
         $this->setAddon($addon);
         if ($ticket) {
             $this->setTicket($ticket);

@@ -73,7 +73,7 @@ class ShopOrderPositionTicket extends ShopOrderPosition
     public function getText(): ?string
     {
         if (empty($this->ticket)) {
-            return "Ticket";
+            $baseText = "Ticket";
         } else {
             $nr = $this->ticket->getId();
             $addonCount = $this->addons->count();
@@ -81,8 +81,29 @@ class ShopOrderPositionTicket extends ShopOrderPosition
             if ($addonCount > 0) {
                 $baseText .= " (+ {$addonCount} Addon" . ($addonCount > 1 ? 's' : '') . ")";
             }
-            return $baseText;
         }
+        $trigger = $this->getPriceZeroingAddon();
+        if ($trigger) {
+            $baseText .= " (gratis: {$trigger->getName()})";
+        }
+        return $baseText;
+    }
+
+    /**
+     * The addon on this ticket that zeroed the ticket base price, if any.
+     */
+    public function getPriceZeroingAddon(): ?ShopAddon
+    {
+        if (($this->getPrice() ?? 0) !== 0) {
+            return null;
+        }
+        foreach ($this->addons as $position) {
+            $addon = $position->getAddon();
+            if ($addon && $addon->isZerosTicketPrice()) {
+                return $addon;
+            }
+        }
+        return null;
     }
 
     /**

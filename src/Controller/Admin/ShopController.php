@@ -127,8 +127,12 @@ class ShopController extends AbstractController
         ]);
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
-            $this->shopService->saveAddon($form->getData());
+            $addon = $form->getData();
+            $this->shopService->saveAddon($addon);
             $this->addFlash('success', "Addon wurde erfolgreich angelegt.");
+            foreach ($this->shopService->getAddonConfigWarnings($addon) as $warning) {
+                $this->addFlash('warning', $warning);
+            }
             return $this->redirectToRoute('admin_shop_addon');
         }
         return $this->render('admin/shop/show_addon.html.twig', ['form' => $form->createView()]);
@@ -146,6 +150,9 @@ class ShopController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $this->shopService->saveAddon($form->getData());
             $this->addFlash('success', "Änderung an Addon {$addon->getId()} erfolgreich.");
+            foreach ($this->shopService->getAddonConfigWarnings($addon) as $warning) {
+                $this->addFlash('warning', $warning);
+            }
             return $this->redirectToRoute('admin_shop_addon');
         }
 
@@ -250,8 +257,13 @@ class ShopController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             try {
-                $this->shopService->addAddonToOrder($order, $form->get('addon')->getData(), $form->get('quantity')->getData());
+                /** @var ShopAddon $addon */
+                $addon = $form->get('addon')->getData();
+                $this->shopService->addAddonToOrder($order, $addon, $form->get('quantity')->getData());
                 $this->addFlash('success', 'Addon wurde hinzugefügt.');
+                if ($addon->isZeroTrigger()) {
+                    $this->addFlash('warning', 'Hinweis: Bereits gebuchte Positionen behalten ihren Preis. Die 0 €-Regel von "' . $addon->getName() . '" gilt nur für zukünftig hinzugefügte Add-ons. Falls nötig, Differenz manuell gutschreiben.');
+                }
                 return $this->json(['success' => true]);
             } catch (\Throwable $e) {
                 $this->addFlash('error', 'Addon konnte nicht hinzugefügt werden: ' . $e->getMessage());

@@ -297,23 +297,61 @@ class ShopService
         }
     }
 
-    public function orderAddAddon(ShopOrder $order, ShopAddon $addon, int $cnt): void
+    public function orderAddAddon(ShopOrder $order, ShopAddon $addon, int $cnt, ?ShopAddon $zeroedBy = null): void
     {
         for ($i = 0; $i < $cnt; $i++) {
-            $order->addShopOrderPosition((new ShopOrderPositionAddon())->fillWithAddon($addon));
+            $order->addShopOrderPosition((new ShopOrderPositionAddon())->fillWithAddon($addon, null, $zeroedBy));
         }
     }
 
     /**
      * Add an addon to a specific ticket
      */
-    public function orderAddAddonToTicket(ShopOrderPositionTicket $ticket, ShopAddon $addon, int $cnt = 1): void
+    public function orderAddAddonToTicket(ShopOrderPositionTicket $ticket, ShopAddon $addon, int $cnt = 1, ?ShopAddon $zeroedBy = null): void
     {
         for ($i = 0; $i < $cnt; $i++) {
-            $addonPosition = (new ShopOrderPositionAddon())->fillWithAddon($addon, $ticket);
+            $addonPosition = (new ShopOrderPositionAddon())->fillWithAddon($addon, $ticket, $zeroedBy);
             $ticket->getOrder()->addShopOrderPosition($addonPosition);
             $ticket->addAddon($addonPosition);
         }
+    }
+
+    /**
+     * The addon among $ticketAddons that zeroes the price of $addon, or null if $addon keeps its price.
+     * An addon is zeroed if a trigger on the same ticket lists it, or (floor rule) if a trigger zeroes
+     * the ticket base price and $addon has a negative price — a free ticket must not go below 0€.
+     *
+     * @param ShopAddon[]|iterable $ticketAddons addons selected/present on the same ticket
+     */
+    public function getZeroingTrigger(ShopAddon $addon, iterable $ticketAddons): ?ShopAddon
+    {
+        foreach ($ticketAddons as $trigger) {
+            if ($trigger === $addon || ($trigger->getId() !== null && $trigger->getId() === $addon->getId())) {
+                continue;
+            }
+            if ($trigger->zerosAddon($addon)) {
+                return $trigger;
+            }
+            if ($trigger->isZerosTicketPrice() && ($addon->getPrice() ?? 0) < 0) {
+                return $trigger;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The addon among $ticketAddons that zeroes the ticket base price, or null.
+     *
+     * @param ShopAddon[]|iterable $ticketAddons addons selected/present on the same ticket
+     */
+    public function getTicketZeroingTrigger(iterable $ticketAddons): ?ShopAddon
+    {
+        foreach ($ticketAddons as $trigger) {
+            if ($trigger->isZerosTicketPrice()) {
+                return $trigger;
+            }
+        }
+        return null;
     }
 
     /**
@@ -322,10 +360,12 @@ class ShopService
     public function processTicketAddons(ShopOrder $order, array $ticketAddonsData): void
     {
         // Get all ticket positions from the order
-        $ticketPositions = array_filter(
+        $ticketPositions = array_values(array_filter(
             $order->getShopOrderPositions()->toArray(),
             fn($pos) => $pos instanceof ShopOrderPositionTicket
-        );
+        ));
+
+        $addons = $this->getAddons();
 
         foreach ($ticketAddonsData as $ticketIndex => $addonData) {
             if (!isset($ticketPositions[$ticketIndex])) {
@@ -333,16 +373,24 @@ class ShopService
             }
 
             $ticket = $ticketPositions[$ticketIndex];
-            $addons = $this->getAddons();
 
+            // collect the full selection of this ticket first, the zero-rules depend on it
+            $selection = [];
             foreach ($addons as $addon) {
-                $addonFieldName = "addon{$addon->getId()}";
-                if (isset($addonData[$addonFieldName])) {
-                    $quantity = (int) $addonData[$addonFieldName];
-                    if ($quantity > 0) {
-                        $this->orderAddAddonToTicket($ticket, $addon, $quantity);
-                    }
+                $quantity = (int) ($addonData["addon{$addon->getId()}"] ?? 0);
+                if ($quantity > 0) {
+                    $selection[] = [$addon, $quantity];
                 }
+            }
+            $selectedAddons = array_map(fn($s) => $s[0], $selection);
+
+            if ($this->getTicketZeroingTrigger($selectedAddons)) {
+                $ticket->setPrice(0);
+            }
+
+            foreach ($selection as [$addon, $quantity]) {
+                $zeroedBy = $this->getZeroingTrigger($addon, $selectedAddons);
+                $this->orderAddAddonToTicket($ticket, $addon, $quantity, $zeroedBy);
             }
         }
     }
@@ -383,6 +431,34 @@ class ShopService
     {
         $this->em->persist($addon);
         $this->em->flush();
+    }
+
+    /**
+     * Admin-facing warnings about incomplete zero-rule configuration.
+     *
+     * @return string[]
+     */
+    public function getAddonConfigWarnings(ShopAddon $addon): array
+    {
+        if (!$addon->isZerosTicketPrice()) {
+            return [];
+        }
+        $missing = [];
+        foreach ($this->getAddons() as $other) {
+            if ($other->getId() === $addon->getId() || ($other->getPrice() ?? 0) >= 0 || $addon->zerosAddon($other)) {
+                continue;
+            }
+            $missing[] = $other->getName();
+        }
+        if (empty($missing)) {
+            return [];
+        }
+        return [sprintf(
+            '"%s" setzt den Ticketpreis auf 0 €, aber folgende Addons mit negativem Preis fehlen in der 0 €-Liste: %s. '
+            . 'Sie werden bei gemeinsamer Auswahl trotzdem auf 0 € gesetzt, damit kein negativer Ticketpreis entsteht.',
+            $addon->getName(),
+            implode(', ', $missing)
+        )];
     }
 
     public function deleteAddon(ShopAddon $addon): void
@@ -551,14 +627,34 @@ class ShopService
         if (in_array($order->getStatus(), [ShopOrderStatus::Refunded, ShopOrderStatus::Canceled])) {
             throw new OrderLifecycleException($order);
         }
-        // Enforce limits before persisting
-        $tempOrder = clone $order; // shallow clone, positions retained
-        $this->orderAddAddon($tempOrder, $addon, $quantity);
-        if (!$this->orderAdheresToLimits($tempOrder, $order->getStatus() === ShopOrderStatus::Paid)) {
+        // Apply zero-rules of addons already on the order; only unambiguous with a single ticket
+        $zeroedBy = null;
+        $ticketPositions = array_values(array_filter(
+            $order->getShopOrderPositions()->toArray(),
+            fn($pos) => $pos instanceof ShopOrderPositionTicket
+        ));
+        if (count($ticketPositions) === 1) {
+            $existingAddons = array_filter(array_map(
+                fn(ShopOrderPositionAddon $pos) => $pos->getAddon(),
+                $ticketPositions[0]->getAddons()->toArray()
+            ));
+            $zeroedBy = $this->getZeroingTrigger($addon, $existingAddons);
+        }
+        // Append positions, then enforce limits before flushing; roll back in-memory on violation.
+        // (A shallow clone can't be used for the probe: it shares the positions collection, and the
+        // probe position pointing at the unmanaged clone makes the later flush fail.)
+        $newPositions = [];
+        for ($i = 0; $i < $quantity; $i++) {
+            $position = (new ShopOrderPositionAddon())->fillWithAddon($addon, null, $zeroedBy);
+            $order->addShopOrderPosition($position);
+            $newPositions[] = $position;
+        }
+        if (!$this->orderAdheresToLimits($order, $order->getStatus() === ShopOrderStatus::Paid)) {
+            foreach ($newPositions as $position) {
+                $order->removeShopOrderPosition($position);
+            }
             throw new \RuntimeException('Limit verletzt: Addon kann nicht hinzugefügt werden.');
         }
-        // Append positions
-        $this->orderAddAddon($order, $addon, $quantity);
         // Persist changes
         $this->em->persist($order);
         // Add to history
@@ -577,7 +673,7 @@ class ShopService
                 'quantity' => $quantity
             ]);
             // Record a transaction if addon has a price > 0
-            $priceEach = $addon->getPrice();
+            $priceEach = $zeroedBy ? 0 : $addon->getPrice();
             if ($priceEach > 0) {
                 try {
                     $this->transactionService->addManualCredit(
@@ -634,7 +730,13 @@ class ShopService
             }
         }
 
-        $addonPrice = $addon->getPrice();
+        // Apply zero-rules of addons already on this ticket
+        $existingAddons = array_filter(array_map(
+            fn(ShopOrderPositionAddon $pos) => $pos->getAddon(),
+            $ticketPosition->getAddons()->toArray()
+        ));
+        $zeroedBy = $this->getZeroingTrigger($addon, $existingAddons);
+        $addonPrice = $zeroedBy ? 0 : $addon->getPrice();
 
         // Deduct from catering balance if price > 0 (allow negative balance)
         if ($addonPrice > 0) {
@@ -647,7 +749,7 @@ class ShopService
         }
 
         // Add the addon to the ticket
-        $addonPosition = (new ShopOrderPositionAddon())->fillWithAddon($addon, $ticketPosition);
+        $addonPosition = (new ShopOrderPositionAddon())->fillWithAddon($addon, $ticketPosition, $zeroedBy);
         $order->addShopOrderPosition($addonPosition);
         $ticketPosition->addAddon($addonPosition);
 

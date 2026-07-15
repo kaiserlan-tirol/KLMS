@@ -57,6 +57,11 @@ input[name="cateringQrCode"] {
             font-size: 1.1em;
             color: #28a745;
         }
+
+        &.addon-zeroed .addon-price-value {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
         
         .addon-control {
             .form-check {

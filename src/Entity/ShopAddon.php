@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\ShopAddonsRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -37,6 +39,30 @@ class ShopAddon
 
     #[ORM\Column]
     private ?bool $onePerTicket = false;
+
+    /** When this addon is selected on a ticket, the ticket's base price becomes 0. */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $zerosTicketPrice = false;
+
+    /** @var Collection<int, ShopAddon> Addons that become 0€ on the same ticket when this addon is selected. */
+    #[ORM\ManyToMany(targetEntity: self::class)]
+    #[ORM\JoinTable(name: 'shop_addon_zeros')]
+    #[ORM\JoinColumn(name: 'addon_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'target_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    private Collection $zerosAddons;
+
+    /** @var Collection<int, ShopAddon> Addons that must be selected on the same ticket when this addon is selected. */
+    #[ORM\ManyToMany(targetEntity: self::class)]
+    #[ORM\JoinTable(name: 'shop_addon_requires')]
+    #[ORM\JoinColumn(name: 'addon_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'target_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    private Collection $requiresAddons;
+
+    public function __construct()
+    {
+        $this->zerosAddons = new ArrayCollection();
+        $this->requiresAddons = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -135,5 +161,76 @@ class ShopAddon
     {
         $this->onePerTicket = $onePerTicket;
         return $this;
+    }
+
+    public function isZerosTicketPrice(): bool
+    {
+        return $this->zerosTicketPrice;
+    }
+
+    public function setZerosTicketPrice(bool $zerosTicketPrice): static
+    {
+        $this->zerosTicketPrice = $zerosTicketPrice;
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, ShopAddon>
+     */
+    public function getZerosAddons(): Collection
+    {
+        return $this->zerosAddons;
+    }
+
+    public function addZerosAddon(ShopAddon $addon): static
+    {
+        if (!$this->zerosAddons->contains($addon) && $addon !== $this) {
+            $this->zerosAddons->add($addon);
+        }
+        return $this;
+    }
+
+    public function removeZerosAddon(ShopAddon $addon): static
+    {
+        $this->zerosAddons->removeElement($addon);
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, ShopAddon>
+     */
+    public function getRequiresAddons(): Collection
+    {
+        return $this->requiresAddons;
+    }
+
+    public function addRequiresAddon(ShopAddon $addon): static
+    {
+        if (!$this->requiresAddons->contains($addon) && $addon !== $this) {
+            $this->requiresAddons->add($addon);
+        }
+        return $this;
+    }
+
+    public function removeRequiresAddon(ShopAddon $addon): static
+    {
+        $this->requiresAddons->removeElement($addon);
+        return $this;
+    }
+
+    /** Whether this addon zeroes the ticket price or other addons when selected. */
+    public function isZeroTrigger(): bool
+    {
+        return $this->zerosTicketPrice || !$this->zerosAddons->isEmpty();
+    }
+
+    public function zerosAddon(ShopAddon $addon): bool
+    {
+        foreach ($this->zerosAddons as $target) {
+            if ($target === $addon || ($target->getId() !== null && $target->getId() === $addon->getId())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

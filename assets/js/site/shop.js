@@ -70,6 +70,9 @@ const Shop = function ($root, config) {
     
     // Initialize number input controls
     this._initNumberInputControls();
+
+    // Live feedback for zero-price rules (e.g. "Erstbesuch U18" makes entry/other addons free)
+    this._initZeroRuleHighlight();
 }
 
 function storeVisibility(elements) {
@@ -218,6 +221,53 @@ $.extend(Shop.prototype, {
                 this.$ticketAddonSections.find('input').val(0).prop('checked', false);
             }
         }
+
+        this._updateZeroHighlights();
+    },
+    _initZeroRuleHighlight() {
+        $(document).on('change input', '#ticket-addon-list input', () => this._updateZeroHighlights());
+        this._updateZeroHighlights();
+    },
+    _isAddonSelected($card) {
+        const $input = $card.find('.addon-control input').first();
+        if ($input.attr('type') === 'checkbox') {
+            return $input.prop('checked');
+        }
+        return (parseInt($input.val()) || 0) > 0;
+    },
+    // Per ticket section: mark addons as free that are zeroed by a selected trigger addon
+    // (its data-zeros-addons list, plus all negative-priced addons if it zeroes the ticket price).
+    _updateZeroHighlights() {
+        this.$ticketAddonSections.each((i, section) => {
+            const $cards = $(section).find('.addon-card');
+            const zeroed = new Set();
+            let ticketFree = false;
+
+            $cards.each((j, card) => {
+                const $card = $(card);
+                if (!this._isAddonSelected($card)) { return; }
+                String($card.data('zerosAddons') ?? '').split(',')
+                    .filter(id => id !== '')
+                    .forEach(id => zeroed.add(id));
+                if (parseInt($card.data('zerosTicket')) === 1) {
+                    ticketFree = true;
+                    $cards.each((k, other) => {
+                        const $other = $(other);
+                        if (parseInt($other.data('price')) < 0 && $other.data('addonId') !== $card.data('addonId')) {
+                            zeroed.add(String($other.data('addonId')));
+                        }
+                    });
+                }
+            });
+
+            $cards.each((j, card) => {
+                const $card = $(card);
+                const isZeroed = zeroed.has(String($card.data('addonId')));
+                $card.toggleClass('addon-zeroed', isZeroed);
+                $card.find('.addon-gratis-badge').toggleClass('d-none', !isZeroed);
+            });
+            $(section).find('.ticket-free-badge').toggleClass('d-none', !ticketFree);
+        });
     },
     _showAdditional() {
         this.$formTicketAdditional.val(0);

@@ -7,6 +7,9 @@ use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -59,6 +62,23 @@ class TicketAddonSelectionType extends AbstractType
                 ]));
             }
         }
+
+        // enforce "requires addons" dependencies within this ticket's selection
+        $builder->addEventListener(FormEvents::POST_SUBMIT, function (FormEvent $event) use ($addons) {
+            $form = $event->getForm();
+            $data = $event->getData() ?? [];
+            $selected = fn(ShopAddon $addon) => !empty($data["addon{$addon->getId()}"]);
+            foreach ($addons as $addon) {
+                if (!$selected($addon)) {
+                    continue;
+                }
+                foreach ($addon->getRequiresAddons() as $required) {
+                    if ($required->isActive() && !$selected($required)) {
+                        $form->addError(new FormError(sprintf('"%s" kann nur zusammen mit "%s" gebucht werden.', $addon->getName(), $required->getName())));
+                    }
+                }
+            }
+        });
     }
 
     public function configureOptions(OptionsResolver $resolver): void

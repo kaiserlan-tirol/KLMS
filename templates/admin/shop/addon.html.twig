@@ -38,7 +38,17 @@
                                 <span title="bestellt/bezahlt/verfügbar">{{ countAddons[addon.id] ?? 0 }}&nbsp;/&nbsp;{{ countAddonsPaid[addon.id] ?? 0 }}&nbsp;/&nbsp;{% if addon.maxQuantityGlobal is not null %}{{ addon.maxQuantityGlobal }}{% else %}∞{% endif %}</span>
                             </td>
                             <td class="text-center">{{ addon.sortIndex }}</td>
-                            <td>{{ addon.name }}</td>
+                            <td>
+                                {{ addon.name }}
+                                {% if addon.zeroTrigger %}
+                                    <i class="fa-solid fa-tags text-success"
+                                       title="Setzt auf 0 €: {% if addon.zerosTicketPrice %}Ticketpreis{% if addon.zerosAddons is not empty %}, {% endif %}{% endif %}{{ addon.zerosAddons|map(a => a.name)|join(', ') }}"></i>
+                                {% endif %}
+                                {% if addon.requiresAddons is not empty %}
+                                    <i class="fa-solid fa-link text-muted"
+                                       title="Erfordert: {{ addon.requiresAddons|map(a => a.name)|join(', ') }}"></i>
+                                {% endif %}
+                            </td>
                             <td class="text-center" data-order="{{ addon.onlyOnce }}">
                                 {% if addon.onlyOnce %}<i title="einmalig buchbar" class="fa-solid fa-hand-point-up"></i>{% endif %}
                             </td>

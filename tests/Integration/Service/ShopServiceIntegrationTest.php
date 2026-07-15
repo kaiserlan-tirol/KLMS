@@ -4,9 +4,12 @@ namespace App\Tests\Integration\Service;
 
 use App\DataFixtures\SettingsFixture;
 use App\DataFixtures\ShopFixture;
+use App\Entity\ShopAddon;
+use App\Entity\ShopOrder;
 use App\Entity\ShopOrderPositionAddon;
 use App\Entity\ShopOrderPositionTicket;
 use App\Entity\ShopOrderStatus;
+use App\Entity\Ticket;
 use App\Entity\User;
 use App\Exception\OrderLifecycleException;
 use App\Idm\IdmManager;
@@ -14,6 +17,8 @@ use App\Service\SettingService;
 use App\Service\ShopService;
 use App\Service\TicketService;
 use App\Tests\Integration\DatabaseTestCase;
+use DateTimeImmutable;
+use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Nonstandard\Uuid;
 
 class ShopServiceIntegrationTest extends DatabaseTestCase
@@ -324,5 +329,242 @@ class ShopServiceIntegrationTest extends DatabaseTestCase
         $shopService->orderAddAddon($order, $addon, 3);
         $this->expectException(OrderLifecycleException::class);
         $shopService->placeOrder($order);
+    }
+
+    /**
+     * "Erstbesuch U18" setup: zeroes the ticket price and "Unter 18" explicitly;
+     * "Tagespass" is intentionally NOT listed to exercise the negative-price floor rule.
+     *
+     * @return ShopAddon[] [u18, daypass, foodflat, firstVisit]
+     */
+    private function createZeroRuleAddons(): array
+    {
+        $em = $this->getContainer()->get(EntityManagerInterface::class);
+        $u18 = (new ShopAddon())->setName('Unter 18')->setPrice(-1000)->setOnlyOnce(false)->setActive(true)->setOnePerTicket(true);
+        $daypass = (new ShopAddon())->setName('Tagespass')->setPrice(-1000)->setOnlyOnce(false)->setActive(true)->setOnePerTicket(true);
+        $foodflat = (new ShopAddon())->setName('Foodflat')->setPrice(1800)->setOnlyOnce(false)->setActive(true)->setOnePerTicket(true);
+        $firstVisit = (new ShopAddon())->setName('Erstbesuch U18')->setPrice(0)->setOnlyOnce(false)->setActive(true)->setOnePerTicket(true)
+            ->setZerosTicketPrice(true)
+            ->addZerosAddon($u18)
+            ->addRequiresAddon($u18);
+        foreach ([$u18, $daypass, $foodflat, $firstVisit] as $addon) {
+            $em->persist($addon);
+        }
+        $em->flush();
+        return [$u18, $daypass, $foodflat, $firstVisit];
+    }
+
+    private function ticketPositions(ShopOrder $order): array
+    {
+        return array_values(array_filter(
+            $order->getShopOrderPositions()->toArray(),
+            fn($pos) => $pos instanceof ShopOrderPositionTicket
+        ));
+    }
+
+    private function addonPositionFor(ShopOrder $order, ShopAddon $addon): ?ShopOrderPositionAddon
+    {
+        foreach ($order->getShopOrderPositions() as $pos) {
+            if ($pos instanceof ShopOrderPositionAddon && $pos->getAddon() && $pos->getAddon()->getId() === $addon->getId()) {
+                return $pos;
+            }
+        }
+        return null;
+    }
+
+    public function testZeroRuleZerosTicketAndTargets(): void
+    {
+        $this->databaseTool->loadFixtures([ShopFixture::class, SettingsFixture::class]);
+        $shopService = $this->getContainer()->get(ShopService::class);
+        $user = $this->getUser(3);
+
+        $this->setValue('lan.signup.price', 4000);
+        $this->setValue('lan.signup.discount.price', null);
+        $this->setValue('lan.signup.discount.limit', null);
+        [$u18, $daypass, $foodflat, $firstVisit] = $this->createZeroRuleAddons();
+
+        $order = $shopService->allocOrder($user);
+        $shopService->orderAddTickets($order, 1);
+        $shopService->processTicketAddons($order, [0 => [
+            "addon{$firstVisit->getId()}" => 1,
+            "addon{$u18->getId()}" => 1,
+            "addon{$daypass->getId()}" => 1,
+            "addon{$foodflat->getId()}" => 1,
+        ]]);
+
+        // only the foodflat remains payable
+        $this->assertEquals(1800, $order->calculateTotal());
+
+        $ticket = $this->ticketPositions($order)[0];
+        $this->assertEquals(0, $ticket->getPrice());
+        $this->assertStringContainsString('gratis: Erstbesuch U18', $ticket->getText());
+
+        // explicitly listed target
+        $u18Pos = $this->addonPositionFor($order, $u18);
+        $this->assertEquals(0, $u18Pos->getPrice());
+        $this->assertEquals('Unter 18 (gratis: Erstbesuch U18)', $u18Pos->getText());
+
+        // not listed, but negative price -> floor rule zeroes it as well
+        $daypassPos = $this->addonPositionFor($order, $daypass);
+        $this->assertEquals(0, $daypassPos->getPrice());
+
+        // excluded addon keeps its price
+        $foodflatPos = $this->addonPositionFor($order, $foodflat);
+        $this->assertEquals(1800, $foodflatPos->getPrice());
+        $this->assertEquals('Foodflat', $foodflatPos->getText());
+
+        $shopService->placeOrder($order);
+        $this->assertEquals(ShopOrderStatus::Created, $order->getStatus());
+    }
+
+    public function testZeroRuleWithoutTriggerKeepsPrices(): void
+    {
+        $this->databaseTool->loadFixtures([ShopFixture::class, SettingsFixture::class]);
+        $shopService = $this->getContainer()->get(ShopService::class);
+        $user = $this->getUser(3);
+
+        $this->setValue('lan.signup.price', 4000);
+        $this->setValue('lan.signup.discount.price', null);
+        $this->setValue('lan.signup.discount.limit', null);
+        [$u18, , $foodflat, ] = $this->createZeroRuleAddons();
+
+        $order = $shopService->allocOrder($user);
+        $shopService->orderAddTickets($order, 1);
+        $shopService->processTicketAddons($order, [0 => [
+            "addon{$u18->getId()}" => 1,
+            "addon{$foodflat->getId()}" => 1,
+        ]]);
+
+        $this->assertEquals(4000 - 1000 + 1800, $order->calculateTotal());
+    }
+
+    public function testZeroRuleKeepsGroupDiscountForOtherTickets(): void
+    {
+        $this->databaseTool->loadFixtures([ShopFixture::class, SettingsFixture::class]);
+        $shopService = $this->getContainer()->get(ShopService::class);
+        $user = $this->getUser(3);
+
+        $this->setValue('lan.signup.price', 4000);
+        $this->setValue('lan.signup.discount.price', 3000);
+        $this->setValue('lan.signup.discount.limit', 3);
+        [$u18, , , $firstVisit] = $this->createZeroRuleAddons();
+
+        $order = $shopService->allocOrder($user);
+        $shopService->orderAddTickets($order, 3);
+        $shopService->processTicketAddons($order, [0 => [
+            "addon{$firstVisit->getId()}" => 1,
+            "addon{$u18->getId()}" => 1,
+        ]]);
+
+        // the free ticket still counts towards the discount limit
+        $tickets = $this->ticketPositions($order);
+        $this->assertEquals(0, $tickets[0]->getPrice());
+        $this->assertEquals(3000, $tickets[1]->getPrice());
+        $this->assertEquals(3000, $tickets[2]->getPrice());
+        $this->assertEquals(6000, $order->calculateTotal());
+    }
+
+    public function testZeroRuleOnlyAffectsOwnTicket(): void
+    {
+        $this->databaseTool->loadFixtures([ShopFixture::class, SettingsFixture::class]);
+        $shopService = $this->getContainer()->get(ShopService::class);
+        $user = $this->getUser(3);
+
+        $this->setValue('lan.signup.price', 4000);
+        $this->setValue('lan.signup.discount.price', null);
+        $this->setValue('lan.signup.discount.limit', null);
+        [$u18, , , $firstVisit] = $this->createZeroRuleAddons();
+
+        $order = $shopService->allocOrder($user);
+        $shopService->orderAddTickets($order, 2);
+        $shopService->processTicketAddons($order, [
+            0 => ["addon{$firstVisit->getId()}" => 1, "addon{$u18->getId()}" => 1],
+            1 => ["addon{$u18->getId()}" => 1],
+        ]);
+
+        $tickets = $this->ticketPositions($order);
+        $this->assertEquals(0, $tickets[0]->getPrice());
+        $this->assertEquals(4000, $tickets[1]->getPrice());
+        // the second ticket's "Unter 18" keeps its discount price
+        $this->assertEquals(0 + 4000 - 1000, $order->calculateTotal());
+    }
+
+    public function testZeroRuleAppliesInAdminAddAddonFlow(): void
+    {
+        $this->databaseTool->loadFixtures([ShopFixture::class, SettingsFixture::class]);
+        $shopService = $this->getContainer()->get(ShopService::class);
+        $user = $this->getUser(3);
+
+        $this->setValue('lan.signup.price', 4000);
+        $this->setValue('lan.signup.discount.price', null);
+        $this->setValue('lan.signup.discount.limit', null);
+        [$u18, $daypass, , $firstVisit] = $this->createZeroRuleAddons();
+
+        // free order -> auto-paid on placement
+        $order = $shopService->allocOrder($user);
+        $shopService->orderAddTickets($order, 1);
+        $shopService->processTicketAddons($order, [0 => [
+            "addon{$firstVisit->getId()}" => 1,
+            "addon{$u18->getId()}" => 1,
+        ]]);
+        $shopService->placeOrder($order);
+        $this->assertEquals(0, $order->calculateTotal());
+        $this->assertEquals(ShopOrderStatus::Paid, $order->getStatus());
+
+        // admin adds a day pass afterwards: zero-rule must apply, no bogus credit
+        $shopService->addAddonToOrder($order, $daypass, 1);
+        $daypassPos = $this->addonPositionFor($order, $daypass);
+        $this->assertNotNull($daypassPos);
+        $this->assertEquals(0, $daypassPos->getPrice());
+        $this->assertEquals(0, $order->calculateTotal());
+    }
+
+    public function testZeroRuleAppliesInCateringBalanceFlow(): void
+    {
+        $this->databaseTool->loadFixtures([ShopFixture::class, SettingsFixture::class]);
+        $shopService = $this->getContainer()->get(ShopService::class);
+        $em = $this->getContainer()->get(EntityManagerInterface::class);
+        [, $daypass, , $firstVisit] = $this->createZeroRuleAddons();
+
+        $ticket = (new Ticket())->setCode('CODE1-KRRUG-ZZZZZ')->setCreatedAt(new DateTimeImmutable());
+        $ticketPos = (new ShopOrderPositionTicket())->setTicket($ticket)->setPrice(0);
+        $order = (new ShopOrder())
+            ->setOrderer(Uuid::fromInteger(strval(3)))
+            ->setCreatedAt(new DateTimeImmutable())
+            ->setStatus(ShopOrderStatus::Paid)
+            ->addShopOrderPosition($ticketPos);
+        $firstVisitPos = (new ShopOrderPositionAddon())->fillWithAddon($firstVisit, $ticketPos);
+        $ticketPos->addAddon($firstVisitPos);
+        $order->addShopOrderPosition($firstVisitPos);
+        $em->persist($ticket);
+        $em->persist($order);
+        $em->flush();
+
+        $shopService->addAddonToTicketWithCateringBalance($ticket, $daypass);
+
+        $daypassPos = $this->addonPositionFor($order, $daypass);
+        $this->assertNotNull($daypassPos);
+        $this->assertEquals(0, $daypassPos->getPrice());
+        $this->assertStringContainsString('gratis: Erstbesuch U18', $daypassPos->getText());
+        $this->assertEquals(0, $order->calculateTotal());
+    }
+
+    public function testGetAddonConfigWarnings(): void
+    {
+        $this->databaseTool->loadFixtures([ShopFixture::class, SettingsFixture::class]);
+        $shopService = $this->getContainer()->get(ShopService::class);
+        [$u18, $daypass, $foodflat, $firstVisit] = $this->createZeroRuleAddons();
+
+        // daypass is negative but not listed -> warning naming it, but not the others
+        $warnings = $shopService->getAddonConfigWarnings($firstVisit);
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString('Tagespass', $warnings[0]);
+        $this->assertStringNotContainsString('Unter 18', $warnings[0]);
+        $this->assertStringNotContainsString('Foodflat', $warnings[0]);
+
+        // non-trigger addons don't warn
+        $this->assertEmpty($shopService->getAddonConfigWarnings($foodflat));
+        $this->assertEmpty($shopService->getAddonConfigWarnings($u18));
+        $this->assertEmpty($shopService->getAddonConfigWarnings($daypass));
     }
 }
